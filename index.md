@@ -1,20 +1,21 @@
 ---
-title: California EV Market Shock Monitor
+title: Washington ZEV Title Response Monitor
 ---
 
-# California EV Market Shock Monitor
+# Washington ZEV Title Response Monitor
 
-This project examines whether California EV demand appeared to rebound after
-fuel prices increased in early 2026, despite the earlier expiration of federal
-EV incentives.
+This project examines whether Washington's monthly share of new light-duty ZEV
+title transactions rebounded after fuel prices increased in early 2026,
+despite the earlier expiration of federal EV incentives.
 
 [Open the live Shiny app](https://jnn2zr-jonathan-krier.shinyapps.io/ev_market_shock_app/)
 
 ## Cleaned project datasets
 
-- [Statewide quarterly controls](data/quarterly_controls.csv)
-- [County-quarter panel](data/county_panel.csv)
-- [California monthly VMT](data/california_vmt_monthly.csv)
+- [Washington statewide monthly titles](data/washington_titles_monthly.csv)
+- [Washington county monthly titles](data/washington_county_monthly.csv)
+- [Washington monthly gasoline prices](data/washington_gas_monthly.csv)
+- [California quarterly comparison](data/quarterly_controls.csv)
 - [Data dictionary](data/data_dictionary.csv)
 
 ## Project documentation
@@ -24,4 +25,4 @@ EV incentives.
 - [Peer-feedback template](feedback/peer_feedback_received.md)
 
 The dashboard describes timing and association; it does not establish that the
-Iran war caused EV purchases or travel behavior to change.
+Iran war caused vehicle title activity to change.

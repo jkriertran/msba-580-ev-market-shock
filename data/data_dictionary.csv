@@ -30,3 +30,13 @@ conjoint_survey.csv,MPG,Fuel-economy level shown in the profile,category
 conjoint_survey.csv,Price,Purchase-price level shown in the profile,dollars
 conjoint_survey.csv,Rating,Profile rating where 1 is best and 5 is worst,ordinal score
 california_vmt_monthly.csv,source_url,FHWA report URL used for the observation,URL
+washington_titles_monthly.csv,month,Month in which Washington DOL recorded the title transaction,date
+washington_titles_monthly.csv,total_new_ldv_titles,All new light-duty original-title transactions,titles
+washington_titles_monthly.csv,bev_titles,New light-duty battery-electric original titles,titles
+washington_titles_monthly.csv,phev_titles,New light-duty plug-in-hybrid original titles,titles
+washington_titles_monthly.csv,fcev_titles,New light-duty hydrogen fuel-cell original titles,titles
+washington_titles_monthly.csv,zev_titles,BEV plus PHEV plus FCEV original titles,titles
+washington_titles_monthly.csv,zev_share,ZEV titles divided by all new light-duty original titles,proportion
+washington_county_monthly.csv,county,Washington owner county reported by DOL,text
+washington_gas_monthly.csv,month,Month of EIA Washington gasoline-price observations,date
+washington_gas_monthly.csv,washington_regular_gas_price,Average weekly Washington regular gasoline price within month,dollars per gallon

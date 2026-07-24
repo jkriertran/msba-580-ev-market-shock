@@ -1,7 +1,7 @@
-# AI Assistance Disclosure ------------------------------------------------------
-# OpenAI Codex helped structure the reactive Shiny components, create reusable
-# plotting and formatting functions, and draft the initial editorial layout.
-# The group selected the research question, sourced and validated the data, and
+# AI Assistance Disclosure
+# OpenAI Codex helped structure the reactive Shiny components, implement the
+# Washington title-data pipeline and statistical displays, and draft initial
+# explanatory language. The group selected the question, sourced the data, and
 # is responsible for reviewing the analysis and final interpretation.
 
 library(shiny)
@@ -12,29 +12,44 @@ library(readr)
 library(scales)
 library(tidyr)
 
-quarterly <- read_csv("data/quarterly_controls.csv", show_col_types = FALSE) |>
+wa_monthly <- read_csv(
+  "analysis/results/washington_monthly_analysis.csv",
+  show_col_types = FALSE
+) |>
+  mutate(month = as.Date(month))
+wa_county_monthly <- read_csv(
+  "data/washington_county_monthly.csv",
+  show_col_types = FALSE
+) |>
+  mutate(month = as.Date(month))
+wa_county_postwar <- read_csv(
+  "analysis/results/washington_county_postwar.csv",
+  show_col_types = FALSE
+)
+wa_event_summary <- read_csv(
+  "analysis/results/washington_event_summary.csv",
+  show_col_types = FALSE
+)
+wa_model_comparison <- read_csv(
+  "analysis/results/washington_model_comparison.csv",
+  show_col_types = FALSE
+)
+wa_its <- read_csv(
+  "analysis/results/washington_its_coefficients.csv",
+  show_col_types = FALSE
+)
+wa_audit <- read_csv(
+  "analysis/results/washington_data_audit.csv",
+  show_col_types = FALSE
+)
+california_quarterly <- read_csv(
+  "data/quarterly_controls.csv",
+  show_col_types = FALSE
+) |>
   mutate(
     quarter_start = as.Date(quarter_start),
-    quarter_end = as.Date(quarter_end),
     quarter_label = paste(year, paste0("Q", quarter))
-  ) |>
-  arrange(quarter_start)
-
-county_panel <- read_csv("data/county_panel.csv", show_col_types = FALSE) |>
-  mutate(
-    quarter_start = as.Date(quarter_start),
-    quarter_label = paste(year, paste0("Q", quarter))
-  ) |>
-  arrange(county, quarter_start)
-
-vmt_monthly <- read_csv("data/california_vmt_monthly.csv", show_col_types = FALSE) |>
-  mutate(
-    observation_month = as.Date(observation_month),
-    release_month = as.Date(release_month),
-    direction = if_else(yoy_change >= 0, "More driving", "Less driving")
-  ) |>
-  arrange(observation_month)
-
+  )
 conjoint_partworths <- read_csv(
   "analysis/results/conjoint_partworths.csv",
   show_col_types = FALSE
@@ -52,145 +67,150 @@ conjoint_pairwise <- read_csv(
   show_col_types = FALSE
 )
 
-latest_quarter <- max(quarterly$quarter_start, na.rm = TRUE)
-latest_label <- quarterly$quarter_label[quarterly$quarter_start == latest_quarter][1]
+latest_month <- max(wa_monthly$month)
+latest_label <- format(latest_month, "%B %Y")
 
-metric_config <- list(
-  zev_share = list(
-    label = "ZEV share of new light-duty sales", short = "ZEV share", column = "zev_share",
-    axis = "ZEV share of new light-duty sales", formatter = label_percent(accuracy = 0.1),
-    sentence = "the share of new light-duty sales classified as ZEVs"
-  ),
-  zev_sales = list(
-    label = "New light-duty ZEV sales", short = "ZEV sales", column = "zev_sales",
-    axis = "New light-duty ZEVs sold", formatter = label_comma(),
-    sentence = "new light-duty ZEV sales"
-  ),
-  gas_price = list(
-    label = "California gasoline price", short = "Gas price", column = "ca_regular_gas_avg",
-    axis = "Dollars per gallon", formatter = label_dollar(accuracy = 0.01),
-    sentence = "California's average regular gasoline price"
-  ),
-  ev_search = list(
-    label = "EV search interest", short = "EV search", column = "trends_electric_vehicle",
-    axis = "Relative Google Trends interest", formatter = label_number(accuracy = 0.1),
-    sentence = "Google search interest in electric vehicles"
-  )
-)
-
-fmt_delta <- function(value) {
-  if (is.na(value) || !is.finite(value)) return("Not available")
-  paste0(ifelse(value >= 0, "+", ""), percent(value, accuracy = 0.1))
+audit_value <- function(metric_name) {
+  wa_audit |>
+    filter(metric == metric_name) |>
+    pull(value)
 }
 
-quarter_axis <- function(x) {
-  month_number <- as.integer(format(x, "%m"))
-  paste(format(x, "%Y"), paste0("Q", ((month_number - 1L) %/% 3L) + 1L))
-}
-
-quarter_axis_stacked <- function(x) {
-  month_number <- as.integer(format(x, "%m"))
-  paste0(
-    format(x, "%Y"),
-    "\nQ",
-    ((month_number - 1L) %/% 3L) + 1L
-  )
-}
-
-theme_editorial <- function() {
-  theme_minimal(base_family = "IBM Plex Sans", base_size = 12) +
-    theme(
-      plot.background = element_rect(fill = "#f6f1e7", color = NA),
-      panel.background = element_rect(fill = "#f6f1e7", color = NA),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.x = element_blank(),
-      panel.grid.major.y = element_line(color = "#d8d0c2", linewidth = 0.35),
-      axis.text = element_text(color = "#48443e"),
-      axis.title = element_text(color = "#27241f", face = "bold"),
-      plot.title = element_text(family = "DM Serif Display", size = 20, color = "#171510"),
-      plot.subtitle = element_text(color = "#625d54", margin = margin(b = 14)),
-      plot.caption = element_text(color = "#746e64", hjust = 0),
-      legend.position = "top", legend.justification = "left",
-      legend.title = element_blank()
-    )
-}
-
-event_data <- tibble::tribble(
+event_markers <- tibble::tribble(
   ~date, ~event,
-  as.Date("2023-11-08"), "CVRP closes",
   as.Date("2025-09-30"), "Federal credit ends",
   as.Date("2026-02-28"), "Iran war begins"
 )
 
+postwar <- wa_event_summary |> filter(period == "Post-war")
+prewar <- wa_event_summary |> filter(period == "Post-credit / pre-war")
+war_coefficient <- wa_its |> filter(term == "post_war")
+credit_coefficient <- wa_its |> filter(term == "post_credit")
+
+metric_config <- list(
+  zev_share = list(
+    label = "New light-duty ZEV title share",
+    column = "zev_share",
+    axis = "Share of new light-duty original titles",
+    formatter = label_percent(accuracy = .1)
+  ),
+  zev_titles = list(
+    label = "New light-duty ZEV original titles",
+    column = "zev_titles",
+    axis = "ZEV original-title transactions",
+    formatter = label_comma()
+  ),
+  total_titles = list(
+    label = "All new light-duty original titles",
+    column = "total_new_ldv_titles",
+    axis = "New light-duty original-title transactions",
+    formatter = label_comma()
+  ),
+  gas_price = list(
+    label = "Washington regular gasoline price",
+    column = "washington_regular_gas_price",
+    axis = "Dollars per gallon",
+    formatter = label_dollar(accuracy = .01)
+  )
+)
+
+paper <- "#f6f1e7"
+ink <- "#27241f"
+teal <- "#176b68"
+rust <- "#b9472e"
+gold <- "#8b6b2f"
+muted <- "#746e64"
+
+theme_editorial <- function() {
+  theme_minimal(base_family = "IBM Plex Sans", base_size = 12) +
+    theme(
+      plot.background = element_rect(fill = paper, color = NA),
+      panel.background = element_rect(fill = paper, color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_line(color = "#ded6c9", linewidth = .3),
+      panel.grid.major.y = element_line(color = "#d8d0c2", linewidth = .35),
+      axis.text = element_text(color = "#48443e"),
+      axis.title = element_text(color = ink, face = "bold"),
+      axis.title.y = element_text(margin = margin(r = 12)),
+      plot.title = element_text(
+        family = "DM Serif Display",
+        size = 20,
+        color = "#171510"
+      ),
+      plot.subtitle = element_text(color = "#625d54", margin = margin(b = 12)),
+      plot.caption = element_text(color = muted, hjust = 0),
+      legend.position = "top",
+      legend.justification = "left",
+      legend.title = element_blank(),
+      plot.margin = margin(8, 8, 8, 24)
+    )
+}
+
+quarter_axis <- function(x) {
+  paste0(
+    format(x, "%Y"),
+    "\nQ",
+    ((as.integer(format(x, "%m")) - 1L) %/% 3L) + 1L
+  )
+}
+
 app_css <- "
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-:root {
-  --ink: #171510; --paper: #f6f1e7; --paper-deep: #ebe2d3;
-  --rust: #b9472e; --teal: #176b68; --muted: #6f685e; --line: #cfc5b6;
-}
-body { background: var(--paper); color: var(--ink); font-family: 'IBM Plex Sans', sans-serif; }
-.container-fluid { padding: 0; }
-.masthead { padding: 34px 4.5vw 28px; border-bottom: 1px solid var(--ink); position: relative; overflow: hidden; }
-.masthead:after { content: 'CA'; position: absolute; right: 3vw; top: -52px; font-family: 'DM Serif Display';
-  font-size: 190px; line-height: 1; color: rgba(185,71,46,.08); pointer-events: none; }
-.eyebrow { color: var(--rust); font-weight: 600; letter-spacing: .16em; text-transform: uppercase; font-size: 12px; }
-h1 { font-family: 'DM Serif Display', serif; font-size: clamp(42px, 5vw, 76px); line-height: .96; max-width: 930px; margin: 10px 0 16px; }
-.dek { max-width: 820px; color: var(--muted); font-size: 18px; line-height: 1.55; margin: 0; }
-.app-grid { display: grid; grid-template-columns: minmax(245px, 300px) 1fr; gap: 0; }
-.controls { padding: 30px 25px 60px 4.5vw; border-right: 1px solid var(--line); background: var(--paper-deep); }
-.controls-inner { position: sticky; top: 20px; }
-.controls h2, .section-kicker { font-size: 11px; letter-spacing: .15em; text-transform: uppercase; font-weight: 600; color: var(--rust); }
-.controls .form-group { margin-bottom: 22px; }
-.control-label { font-size: 13px; font-weight: 600; margin-bottom: 7px; }
-.form-control { border: 1px solid #9e9588; border-radius: 0; background: #fffdf8; box-shadow: none; }
-.help-copy { font-size: 12px; color: var(--muted); line-height: 1.55; border-top: 1px solid var(--line); padding-top: 18px; margin-top: 26px; }
-.definition-note { margin-top: 20px; padding: 16px; border: 1px solid #9e9588; background: #fffdf8; font-size: 12px; line-height: 1.45; }
-.definition-note h3 { margin: 0 0 11px; color: var(--rust); font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
-.definition-note dl { margin: 0; }
-.definition-note dt { color: var(--ink); font-weight: 600; }
-.definition-note dd { margin: 2px 0 10px; color: var(--muted); }
-.definition-note p { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
-.content { padding: 30px 4.5vw 70px 34px; min-width: 0; }
-.signal-strip { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--ink); margin-bottom: 26px; }
-.signal { padding: 18px 20px; min-height: 114px; background: #fffdf8; }
-.signal + .signal { border-left: 1px solid var(--ink); }
-.signal-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; }
-.signal-value { font-family: 'DM Serif Display'; font-size: 34px; line-height: 1.1; margin: 7px 0 3px; }
-.signal-note { font-size: 12px; color: var(--muted); }
-.panel { border: 0; border-top: 3px solid var(--ink); border-radius: 0; box-shadow: none; background: transparent; margin: 0 0 34px; padding-top: 16px; }
-.panel-title { font-family: 'DM Serif Display'; font-size: 25px; margin: 0; }
-.panel-subtitle { color: var(--muted); margin: 6px 0 12px; }
-.two-up { display: grid; grid-template-columns: 1.35fr .85fr; gap: 32px; align-items: start; }
-.insight-box { background: var(--teal); color: #fffdf8; padding: 25px; margin-top: 12px; position: relative; }
-.insight-box:before { content: 'SO WHAT'; display: block; font-size: 10px; letter-spacing: .18em; font-weight: 600; opacity: .7; margin-bottom: 12px; }
-.insight-box strong { color: #ffe0b8; }
-.insight-box p { font-family: 'DM Serif Display'; font-size: 22px; line-height: 1.35; margin: 0; }
-.caveat { margin-top: 15px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,.35); font-family: 'IBM Plex Sans'; font-size: 12px; line-height: 1.5; opacity: .82; }
-.method { border-left: 4px solid var(--rust); padding: 4px 0 4px 17px; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.behavior-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(230px, .55fr); gap: 30px; align-items: stretch; }
-.conjoint-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(250px, .55fr); gap: 30px; align-items: stretch; }
-.evidence-card { background: #fffdf8; border: 1px solid var(--ink); padding: 22px; display: flex; flex-direction: column; justify-content: center; }
-.evidence-card h3 { font-family: 'DM Serif Display'; font-size: 22px; margin: 0 0 16px; }
-.evidence-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); align-items: baseline; }
-.evidence-label { color: var(--muted); font-size: 12px; }
-.evidence-number { font-family: 'DM Serif Display'; font-size: 24px; }
-.evidence-takeaway { margin: 18px 0 0; color: var(--ink); font-size: 13px; line-height: 1.55; }
-.partial-flag { display: inline-block; margin-top: 14px; padding: 7px 9px; background: #f0dfc7; color: #713322; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
-@media (max-width: 920px) { .app-grid, .two-up { grid-template-columns: 1fr; } .controls { border-right: 0; border-bottom: 1px solid var(--line); padding: 24px 5vw; } .controls-inner { position: static; } .content { padding: 28px 5vw; } }
-@media (max-width: 920px) { .behavior-grid, .conjoint-grid { grid-template-columns: 1fr; } }
-@media (max-width: 620px) { .signal-strip { grid-template-columns: 1fr; } .signal + .signal { border-left: 0; border-top: 1px solid var(--ink); } }
+:root { --ink:#171510; --paper:#f6f1e7; --deep:#ebe2d3; --rust:#b9472e; --teal:#176b68; --muted:#6f685e; --line:#cfc5b6; }
+body { background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; }
+.container-fluid { padding:0; }
+.masthead { padding:34px 4.5vw 28px; border-bottom:1px solid var(--ink); position:relative; overflow:hidden; }
+.masthead:after { content:'WA'; position:absolute; right:3vw; top:-52px; font-family:'DM Serif Display'; font-size:180px; color:rgba(185,71,46,.08); }
+.eyebrow,.section-kicker { color:var(--rust); font-weight:600; letter-spacing:.16em; text-transform:uppercase; font-size:11px; }
+h1 { font-family:'DM Serif Display'; font-size:clamp(42px,5vw,74px); line-height:.98; max-width:980px; margin:10px 0 16px; }
+.dek { max-width:900px; color:var(--muted); font-size:18px; line-height:1.55; margin:0; }
+.app-grid { display:grid; grid-template-columns:minmax(250px,305px) 1fr; }
+.controls { padding:30px 25px 60px 4.5vw; border-right:1px solid var(--line); background:var(--deep); }
+.controls-inner { position:sticky; top:20px; }
+.controls h2 { font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--rust); }
+.controls .form-group { margin-bottom:21px; }
+.control-label { font-size:13px; font-weight:600; }
+.form-control { border:1px solid #9e9588; border-radius:0; background:#fffdf8; }
+.help-copy { font-size:12px; color:var(--muted); line-height:1.55; border-top:1px solid var(--line); padding-top:18px; margin-top:25px; }
+.definition-note { margin-top:18px; padding:15px; border:1px solid #9e9588; background:#fffdf8; font-size:12px; line-height:1.48; }
+.definition-note h3 { margin:0 0 9px; color:var(--rust); font-size:10px; letter-spacing:.14em; text-transform:uppercase; }
+.content { padding:30px 4.5vw 70px 34px; min-width:0; }
+.signal-strip { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--ink); margin-bottom:28px; }
+.signal { padding:18px 20px; min-height:112px; background:#fffdf8; }
+.signal + .signal { border-left:1px solid var(--ink); }
+.signal-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; }
+.signal-value { font-family:'DM Serif Display'; font-size:34px; line-height:1.1; margin:7px 0 3px; }
+.signal-note { font-size:12px; color:var(--muted); }
+.panel { border:0; border-top:3px solid var(--ink); border-radius:0; box-shadow:none; background:transparent; margin:0 0 35px; padding-top:16px; }
+.panel-title { font-family:'DM Serif Display'; font-size:27px; margin:0; }
+.panel-subtitle { color:var(--muted); margin:6px 0 12px; line-height:1.5; }
+.two-up { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(250px,.55fr); gap:30px; align-items:stretch; }
+.evidence-card { background:#fffdf8; border:1px solid var(--ink); padding:22px; display:flex; flex-direction:column; justify-content:center; }
+.evidence-card h3 { font-family:'DM Serif Display'; font-size:22px; margin:0 0 14px; }
+.evidence-row { display:grid; grid-template-columns:1fr auto; gap:14px; padding:10px 0; border-top:1px solid var(--line); align-items:baseline; }
+.evidence-label { color:var(--muted); font-size:12px; }
+.evidence-number { font-family:'DM Serif Display'; font-size:24px; }
+.evidence-takeaway { margin:17px 0 0; color:var(--ink); font-size:13px; line-height:1.55; }
+.flag { display:inline-block; margin-top:14px; padding:7px 9px; background:#f0dfc7; color:#713322; font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.method { border-left:4px solid var(--rust); padding:4px 0 4px 17px; color:var(--muted); font-size:13px; line-height:1.6; }
+@media(max-width:920px){.app-grid,.two-up{grid-template-columns:1fr}.controls{border-right:0;border-bottom:1px solid var(--line);padding:24px 5vw}.controls-inner{position:static}.content{padding:28px 5vw}}
+@media(max-width:620px){.signal-strip{grid-template-columns:1fr}.signal+.signal{border-left:0;border-top:1px solid var(--ink)}}
 "
 
 ui <- fluidPage(
   tags$head(tags$style(HTML(app_css))),
   tags$header(
     class = "masthead",
-    div(class = "eyebrow", "California EV Market Shock Monitor"),
-    h1("Did fuel pressure offset the loss of EV incentives?"),
-    p(class = "dek", paste0(
-      "Explore how California EV demand changed around the September 2025 federal tax-credit expiration ",
-      "and the February 2026 Iran war. Data covers 2023 Q1 through ", latest_label, "."
-    ))
+    div(class = "eyebrow", "Washington EV Title Response Monitor"),
+    h1("Did higher fuel costs revive ZEV demand after the credit expired?"),
+    p(
+      class = "dek",
+      paste0(
+        "Observed monthly Washington original-title transactions from January ",
+        "2017 through ", latest_label,
+        ", with California retained as a quarterly comparison."
+      )
+    )
   ),
   div(
     class = "app-grid",
@@ -199,46 +219,70 @@ ui <- fluidPage(
       div(
         class = "controls-inner",
         h2("Build a comparison"),
-        selectInput("county", "Geography", choices = c("California statewide", sort(unique(county_panel$county)))),
         selectInput(
-          "metric", "Primary signal",
+          "county",
+          "Washington geography",
           choices = c(
-            "ZEV share of new light-duty sales" = "zev_share",
-            "New light-duty ZEV sales" = "zev_sales",
-            "California gasoline price" = "gas_price", "EV search interest" = "ev_search"
+            "Washington statewide",
+            sort(setdiff(
+              unique(wa_county_monthly$county),
+              "Unknown or Out of State"
+            ))
           )
         ),
         selectInput(
-          "baseline", "Comparison quarter",
-          choices = setNames(quarterly$quarter_label, quarterly$quarter_label), selected = "2025 Q4"
+          "metric",
+          "Primary signal",
+          choices = c(
+            "New light-duty ZEV title share" = "zev_share",
+            "New light-duty ZEV original titles" = "zev_titles",
+            "All new light-duty original titles" = "total_titles",
+            "Washington gasoline price" = "gas_price"
+          )
         ),
-        checkboxInput("show_events", "Show policy and war markers", value = TRUE),
+        selectInput(
+          "window_start",
+          "Timeline begins",
+          choices = c(
+            "2017 — full history" = "2017-01-01",
+            "2021 — recent adoption period" = "2021-01-01",
+            "2024 — event detail" = "2024-01-01"
+          ),
+          selected = "2021-01-01"
+        ),
+        checkboxInput(
+          "show_events",
+          "Show policy and war markers",
+          value = TRUE
+        ),
         selectInput(
           "conjoint_attribute",
           "Conjoint attribute",
-          choices = c(
-            "All attributes",
-            "Price",
-            "Fuel economy",
-            "Brand"
-          ),
-          selected = "All attributes"
+          choices = c("All attributes", "Price", "Fuel economy", "Brand")
         ),
-        p(class = "help-copy",
-          "Tip: choose a county and ZEV share to compare local adoption with the statewide market. Gas prices and search interest are statewide context signals."
+        p(
+          class = "help-copy",
+          paste(
+            "County selection affects title outcomes.",
+            "Gasoline prices and the regression benchmark are statewide."
+          )
         ),
         div(
           class = "definition-note",
-          h3("Measure definitions"),
-          tags$dl(
-            tags$dt("ZEV sales"),
-            tags$dd("Count of new light-duty BEVs, plug-in hybrids, and hydrogen fuel-cell vehicles."),
-            tags$dt("ZEV share"),
-            tags$dd("ZEV sales divided by all new light-duty vehicle sales."),
-            tags$dt("Vehicle miles traveled"),
-            tags$dd("Estimated miles driven on all California roads and streets; this is broader than the State Highway System.")
+          h3("Primary measure"),
+          p(
+            strong("ZEV title share: "),
+            paste(
+              "new light-duty BEV, PHEV, and FCEV original titles divided",
+              "by all new light-duty original titles."
+            )
           ),
-          p("ZEV metrics exclude used and medium- or heavy-duty vehicles. VMT includes all vehicle classes traveling on covered roads.")
+          p(
+            paste(
+              "Original titles are registration transactions, not dealer sale",
+              "dates. The filter separately requires the DOL new-vehicle flag."
+            )
+          )
         )
       )
     ),
@@ -248,404 +292,372 @@ ui <- fluidPage(
       uiOutput("signal_strip"),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "01 / Market timeline"),
+        div(class = "section-kicker", "01 / Monthly market"),
         h2(class = "panel-title", textOutput("timeline_title", inline = TRUE)),
         p(class = "panel-subtitle", textOutput("timeline_subtitle", inline = TRUE)),
         plotlyOutput("market_plot", height = "430px")
       ),
-      div(
-        class = "two-up",
-        tags$section(
-          class = "panel",
-          div(class = "section-kicker", "02 / Signals in context"),
-          h2(class = "panel-title", "Three market signals, one baseline"),
-          p(class = "panel-subtitle", textOutput("context_subtitle", inline = TRUE)),
-          plotlyOutput("context_plot", height = "350px")
-        ),
-        tags$section(
-          class = "panel",
-          div(class = "section-kicker", "03 / Interpretation"),
-          h2(class = "panel-title", "What changed?"),
-          uiOutput("insight")
-        )
-      ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "04 / Behavior response"),
-        h2(class = "panel-title", "Did Californians drive less?"),
+        div(class = "section-kicker", "02 / Regression benchmark"),
+        h2(class = "panel-title", "Observed share versus pre-credit expectation"),
         p(
           class = "panel-subtitle",
-          paste0(
-            "Each bar compares monthly vehicle miles traveled with the same month one year earlier. ",
-            "The 0% line means no change; positive bars mean more driving and negative bars mean less."
+          paste(
+            "The benchmark uses 102 pre-event months, calendar-month effects,",
+            "a quadratic adoption trend, and a COVID disruption indicator."
           )
         ),
         div(
-          class = "behavior-grid",
-          plotlyOutput("vmt_plot", height = "410px"),
-          uiOutput("vmt_evidence")
+          class = "two-up",
+          plotlyOutput("benchmark_plot", height = "440px"),
+          uiOutput("regression_evidence")
         )
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "05 / County benchmark"),
-        h2(class = "panel-title", paste("County EV share in", latest_label)),
-        p(class = "panel-subtitle", "Top 12 counties plus your selected county; share controls for differences in market size."),
-        plotlyOutput("county_plot", height = "430px")
+        div(class = "section-kicker", "03 / County response"),
+        h2(class = "panel-title", "Where did ZEV title share change?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "Post-war March–June 2026 versus post-credit/pre-war",
+            "November 2025–February 2026; largest county markets shown."
+          )
+        ),
+        plotlyOutput("county_plot", height = "470px")
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "06 / Stated preferences"),
+        div(class = "section-kicker", "04 / California comparison"),
+        h2(class = "panel-title", "Did the neighboring market move similarly?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "Both series are indexed to 100 in 2025 Q4.",
+            "Washington titles and California CEC-inferred sales are",
+            "directionally comparable but not identical measures."
+          )
+        ),
+        plotlyOutput("state_comparison_plot", height = "390px")
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "05 / Stated preferences"),
         h2(class = "panel-title", "What did survey respondents value?"),
         p(
           class = "panel-subtitle",
-          paste0(
-            "Rating-based conjoint utilities: positive values indicate greater ",
-            "preference within an attribute; intervals show respondent-clustered uncertainty."
+          paste(
+            "Rating-based part-worth utilities complement observed titles;",
+            "positive values indicate greater stated preference."
           )
         ),
         div(
-          class = "conjoint-grid",
-          plotlyOutput("conjoint_plot", height = "520px"),
+          class = "two-up",
+          plotlyOutput("conjoint_plot", height = "510px"),
           uiOutput("conjoint_evidence")
         )
       ),
       div(
         class = "method",
         strong("Interpretation guardrail: "),
-        "This dashboard describes timing and association; it does not prove that the war caused EV sales or driving to change. Q2 2026 is the first full post-war sales quarter, but the VMT series currently ends in May. Sources include the California Energy Commission, EIA, FRED/BLS, Google Trends, and FHWA Traffic Volume Trends using state-reported counts."
+        paste(
+          "This is an observational interrupted-time-series study.",
+          "The post-war period contains four months, and overlapping policy,",
+          "price, incentive, and market changes prevent causal attribution."
+        )
       )
     )
   )
 )
 
 server <- function(input, output, session) {
-  selected_config <- reactive(metric_config[[input$metric]])
-
   selected_series <- reactive({
-    cfg <- selected_config()
-    statewide_only <- input$metric %in% c("gas_price", "ev_search") || input$county == "California statewide"
-
-    if (statewide_only) {
-      quarterly |>
-        transmute(
-          quarter_start, quarter_label,
-          value = .data[[cfg$column]], geography = "California statewide"
-        )
+    if (input$county == "Washington statewide") {
+      wa_monthly
     } else {
-      county_panel |>
+      wa_county_monthly |>
         filter(county == input$county) |>
-        transmute(quarter_start, quarter_label, value = .data[[cfg$column]], geography = county)
+        left_join(
+          select(
+            wa_monthly,
+            month,
+            washington_regular_gas_price
+          ),
+          by = "month"
+        )
     }
   })
 
-  comparison_values <- reactive({
-    series <- selected_series()
-    current <- series |> filter(quarter_start == max(quarter_start, na.rm = TRUE)) |> slice(1)
-    baseline <- series |> filter(quarter_label == input$baseline) |> slice(1)
-    delta <- if (nrow(baseline) && baseline$value != 0) current$value / baseline$value - 1 else NA_real_
-    list(current = current, baseline = baseline, delta = delta)
+  output$signal_strip <- renderUI({
+    share_change <- postwar$pooled_zev_share - prewar$pooled_zev_share
+    gas_change <- postwar$mean_gas_price / prewar$mean_gas_price - 1
+    div(
+      class = "signal-strip",
+      div(
+        class = "signal",
+        div(class = "signal-label", "March–June 2026 ZEV title share"),
+        div(
+          class = "signal-value",
+          percent(postwar$pooled_zev_share, accuracy = .1)
+        ),
+        div(class = "signal-note", "Washington statewide")
+      ),
+      div(
+        class = "signal",
+        div(class = "signal-label", "Change from Nov.–Feb."),
+        div(
+          class = "signal-value",
+          number(100 * share_change, accuracy = .1, suffix = " pp")
+        ),
+        div(class = "signal-note", "Pooled title share")
+      ),
+      div(
+        class = "signal",
+        div(class = "signal-label", "Gas-price change"),
+        div(class = "signal-value", percent(gas_change, accuracy = .1)),
+        div(class = "signal-note", "Post-war vs. Nov.–Feb. average")
+      )
+    )
   })
 
   output$timeline_title <- renderText({
-    paste(selected_config()$label, "through", latest_label)
+    paste(metric_config[[input$metric]]$label, "through", latest_label)
   })
 
   output$timeline_subtitle <- renderText({
-    if (input$metric %in% c("gas_price", "ev_search") && input$county != "California statewide") {
-      paste("This context signal is statewide; county selection remains active in the county benchmark below.")
+    if (input$metric == "gas_price" && input$county != "Washington statewide") {
+      "Gasoline price is statewide; the selected county remains active below."
     } else {
       paste("Selected geography:", input$county)
     }
   })
 
-  output$signal_strip <- renderUI({
-    values <- comparison_values()
-    cfg <- selected_config()
-    current_value <- if (nrow(values$current)) values$current$value else NA_real_
-    baseline_value <- if (nrow(values$baseline)) values$baseline$value else NA_real_
-    gas_now <- quarterly |> filter(quarter_start == latest_quarter) |> pull(ca_regular_gas_avg)
-
-    div(
-      class = "signal-strip",
-      div(class = "signal",
-          div(class = "signal-label", paste(latest_label, cfg$short)),
-          div(class = "signal-value", cfg$formatter(current_value)),
-          div(class = "signal-note", ifelse(input$county == "California statewide" || input$metric %in% c("gas_price", "ev_search"), "California", input$county))
-      ),
-      div(class = "signal",
-          div(class = "signal-label", paste("Change from", input$baseline)),
-          div(class = "signal-value", fmt_delta(values$delta)),
-          div(class = "signal-note", paste("Baseline:", cfg$formatter(baseline_value)))
-      ),
-      div(class = "signal",
-          div(class = "signal-label", paste(latest_label, "gas price")),
-          div(class = "signal-value", dollar(gas_now, accuracy = 0.01)),
-          div(class = "signal-note", "California regular gasoline average")
-      )
-    )
-  })
-
   output$market_plot <- renderPlotly({
-    data <- selected_series()
-    cfg <- selected_config()
-    baseline_value <- data$value[data$quarter_label == input$baseline][1]
+    cfg <- metric_config[[input$metric]]
+    data <- selected_series() |>
+      filter(month >= as.Date(input$window_start)) |>
+      mutate(value = .data[[cfg$column]])
 
-    plot <- ggplot(data, aes(quarter_start, value)) +
-      geom_area(fill = "#176b68", alpha = 0.11) +
-      geom_line(color = "#176b68", linewidth = 1.15) +
-      geom_point(color = "#f6f1e7", fill = "#b9472e", shape = 21, size = 3.2, stroke = 1) +
-      geom_hline(yintercept = baseline_value, color = "#746e64", linetype = "dotted") +
-      scale_x_date(
-        breaks = data$quarter_start,
-        labels = quarter_axis_stacked,
-        expand = expansion(mult = c(.015, .035))
+    plot <- ggplot(data, aes(month, value)) +
+      geom_area(fill = teal, alpha = .10) +
+      geom_line(color = teal, linewidth = 1) +
+      geom_point(color = rust, size = 1.7) +
+      scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
+      scale_y_continuous(
+        labels = cfg$formatter,
+        expand = expansion(mult = c(.08, .16))
       ) +
-      scale_y_continuous(labels = cfg$formatter, expand = expansion(mult = c(.08, .17))) +
-      labs(x = NULL, y = cfg$axis,
-           caption = paste("Dotted line =", input$baseline, "comparison level")) +
-      theme_editorial() +
-      theme(
-        panel.grid.major.x = element_line(color = "#ded6c9", linewidth = 0.3),
-        axis.line.x = element_line(color = "#8f877b", linewidth = 0.45),
-        axis.ticks.x = element_line(color = "#48443e", linewidth = 0.5),
-        axis.ticks.length.x = grid::unit(5, "pt"),
-        axis.text.x = element_text(
-          angle = 0,
-          hjust = 0.5,
-          vjust = 1,
-          lineheight = 0.95,
-          margin = margin(t = 7)
-        )
-      )
+      labs(x = NULL, y = cfg$axis) +
+      theme_editorial()
 
     if (isTRUE(input$show_events)) {
       plot <- plot +
-        geom_vline(data = event_data, aes(xintercept = date), color = "#b9472e", linetype = "longdash", linewidth = .45) +
-        geom_text(data = event_data, aes(x = date, y = Inf, label = event), inherit.aes = FALSE,
-                  angle = 90, vjust = 1.25, hjust = 1.05, size = 3, color = "#7f2e20")
+        geom_vline(
+          data = event_markers,
+          aes(xintercept = date),
+          color = rust,
+          linetype = "longdash",
+          linewidth = .5
+        )
     }
     ggplotly(plot, tooltip = c("x", "y")) |>
       config(displayModeBar = FALSE)
   })
 
-  output$context_plot <- renderPlotly({
-    base <- quarterly |>
-      select(quarter_start, quarter_label, zev_share, ca_regular_gas_avg, trends_electric_vehicle) |>
-      pivot_longer(c(zev_share, ca_regular_gas_avg, trends_electric_vehicle), names_to = "signal", values_to = "value") |>
-      group_by(signal) |>
-      mutate(
-        baseline = value[quarter_label == input$baseline][1],
-        index = 100 * value / baseline
-      ) |>
-      ungroup() |>
-      mutate(signal = recode(signal,
-        zev_share = "EV market share", ca_regular_gas_avg = "Gas price", trends_electric_vehicle = "EV search interest"
-      ))
-
-    baseline_date <- base |>
-      filter(quarter_label == input$baseline) |>
-      summarise(value = first(quarter_start)) |>
-      pull(value)
-
-    plot <- ggplot(
-      base,
-      aes(quarter_start, index, color = signal, group = signal)
-    ) +
-      geom_hline(yintercept = 100, color = "#746e64", linetype = "dotted") +
+  output$benchmark_plot <- renderPlotly({
+    display <- wa_monthly |>
+      filter(month >= as.Date(input$window_start))
+    plot <- ggplot(display, aes(month)) +
+      geom_ribbon(
+        aes(
+          ymin = empirical_prediction_low,
+          ymax = empirical_prediction_high
+        ),
+        fill = teal,
+        alpha = .12
+      ) +
+      geom_line(
+        aes(y = expected_zev_share, color = "Pre-credit expectation"),
+        linewidth = .9
+      ) +
+      geom_line(
+        aes(y = zev_share, color = "Observed ZEV title share"),
+        linewidth = 1.1
+      ) +
       geom_vline(
-        xintercept = baseline_date,
-        color = "#b9472e", linetype = "longdash", linewidth = .55
+        xintercept = as.Date("2025-11-01"),
+        color = rust,
+        linetype = "longdash"
       ) +
-      geom_line(linewidth = 1) +
-      geom_point(
-        aes(text = paste0(
-          signal, "<br>", quarter_label,
-          "<br>Index: ", round(index, 1),
-          "<br>Raw value: ", round(value, 2)
-        )),
-        size = 2
+      geom_vline(
+        xintercept = as.Date("2026-03-01"),
+        color = rust,
+        linetype = "dotted"
       ) +
-      geom_point(
-        data = base |> filter(quarter_label == input$baseline),
-        shape = 21, size = 3.1, stroke = .8, fill = "#f6f1e7"
-      ) +
-      annotate(
-        "text",
-        x = baseline_date, y = Inf,
-        label = paste(input$baseline, "baseline"),
-        angle = 90, vjust = 1.25, hjust = 1.05,
-        size = 3, color = "#7f2e20"
-      ) +
-      scale_color_manual(values = c("EV market share" = "#176b68", "Gas price" = "#b9472e", "EV search interest" = "#8b6b2f")) +
-      scale_x_date(date_breaks = "6 months", labels = quarter_axis) +
-      scale_y_continuous(
-        labels = label_number(accuracy = 1),
-        expand = expansion(mult = c(.08, .14))
-      ) +
-      labs(x = NULL, y = paste0("Index (", input$baseline, " = 100)")) +
-      theme_editorial() +
-      theme(
-        axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.y = element_text(margin = margin(r = 12)),
-        plot.margin = margin(t = 8, r = 8, b = 8, l = 28)
-      )
-
-    ggplotly(plot, tooltip = "text") |>
-      config(displayModeBar = FALSE)
-  })
-
-  output$context_subtitle <- renderText({
-    paste0(
-      "All three series equal 100 in ", input$baseline,
-      ". Values above or below 100 show the percentage difference from that quarter."
-    )
-  })
-
-  output$insight <- renderUI({
-    values <- comparison_values()
-    cfg <- selected_config()
-    current_value <- values$current$value
-    baseline_value <- values$baseline$value
-    direction <- if (is.na(values$delta)) "could not be compared with" else if (values$delta >= 0) "was higher than" else "was lower than"
-    geo <- if (input$metric %in% c("gas_price", "ev_search")) "California" else input$county
-    war_share <- quarterly |> filter(quarter_start == latest_quarter) |> pull(zev_share)
-    q4_share <- quarterly |> filter(quarter_label == "2025 Q4") |> pull(zev_share)
-
-    div(
-      class = "insight-box",
-      p(HTML(paste0(
-        "In <strong>", latest_label, "</strong>, ", cfg$sentence, " in ", geo, " was <strong>",
-        cfg$formatter(current_value), "</strong>. That ", direction, " ", input$baseline,
-        " (", cfg$formatter(baseline_value), ") by <strong>", fmt_delta(values$delta), "</strong>."
-      ))),
-      div(class = "caveat", paste0(
-        "Post-war checkpoint: statewide EV share moved from ", percent(q4_share, accuracy = .1),
-        " in 2025 Q4 to ", percent(war_share, accuracy = .1), " in ", latest_label,
-        ". Treat this as a descriptive rebound, not a causal estimate."
-      ))
-    )
-  })
-
-  output$vmt_plot <- renderPlotly({
-    display <- vmt_monthly |>
-      filter(observation_month >= as.Date("2024-01-01"))
-
-    plot <- ggplot(display, aes(observation_month, yoy_change)) +
-      geom_hline(yintercept = 0, color = "#746e64", linewidth = .45) +
-      geom_col(aes(fill = direction), width = 24, alpha = .9) +
-      geom_point(color = "#27241f", size = 1.4) +
-      scale_fill_manual(
-        values = c("More driving" = "#176b68", "Less driving" = "#b9472e"),
-        breaks = c("Less driving", "More driving")
-      ) +
-      scale_x_date(
-        date_breaks = "3 months", date_labels = "%Y\n%b",
-        expand = expansion(mult = c(.015, .035))
-      ) +
-      scale_y_continuous(
-        labels = label_percent(accuracy = 1),
-        breaks = breaks_width(.02),
-        expand = expansion(mult = c(.12, .16))
-      ) +
+      scale_color_manual(values = c(
+        "Observed ZEV title share" = teal,
+        "Pre-credit expectation" = gold
+      )) +
+      scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
+      scale_y_continuous(labels = label_percent(accuracy = 1)) +
       labs(
-        x = NULL, y = "Year-over-year VMT change",
-        caption = "May 2026 is preliminary. June 2026 was not published when this app was updated."
-      ) +
-      theme_editorial() +
-      theme(
-        panel.grid.major.x = element_line(color = "#ded6c9", linewidth = .3),
-        axis.text.x = element_text(hjust = .5, lineheight = .95),
-        axis.title.y = element_text(margin = margin(r = 12)),
-        axis.ticks.x = element_line(color = "#48443e"),
-        axis.ticks.length.x = grid::unit(4, "pt"),
-        plot.margin = margin(t = 8, r = 8, b = 8, l = 32)
-      )
-
-    if (isTRUE(input$show_events)) {
-      plot <- plot +
-        geom_vline(
-          xintercept = as.Date("2026-02-28"),
-          color = "#b9472e", linetype = "longdash", linewidth = .55
-        ) +
-        annotate(
-          "text", x = as.Date("2026-02-28"), y = Inf,
-          label = "Iran war begins", angle = 90,
-          vjust = 1.25, hjust = 1.05, size = 3, color = "#7f2e20"
+        x = NULL,
+        y = "ZEV share",
+        caption = paste(
+          "Shading uses ±1.96 rolling-validation RMSE.",
+          "Dashed = post-credit title period; dotted = post-war period."
         )
-    }
-    ggplotly(plot, tooltip = c("x", "y", "fill")) |>
+      ) +
+      theme_editorial()
+    ggplotly(plot, tooltip = c("x", "y", "colour")) |>
       config(displayModeBar = FALSE)
   })
 
-  output$vmt_evidence <- renderUI({
-    get_change <- function(month) {
-      vmt_monthly |>
-        filter(observation_month == as.Date(month)) |>
-        pull(yoy_change)
-    }
-    march <- get_change("2026-03-01")
-    april <- get_change("2026-04-01")
-    may <- get_change("2026-05-01")
-
+  output$regression_evidence <- renderUI({
+    selected_model <- wa_model_comparison |> filter(selected)
     div(
       class = "evidence-card",
-      h3("Early post-war evidence"),
-      div(class = "evidence-row",
-          span(class = "evidence-label", "March 2026 vs. March 2025"),
-          span(class = "evidence-number", percent(march, accuracy = .1))),
-      div(class = "evidence-row",
-          span(class = "evidence-label", "April 2026 vs. April 2025"),
-          span(class = "evidence-number", percent(april, accuracy = .1))),
-      div(class = "evidence-row",
-          span(class = "evidence-label", "May 2026 vs. May 2025"),
-          span(class = "evidence-number", percent(may, accuracy = .1))),
+      h3("What the model supports"),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Pre-event training months"),
+        span(
+          class = "evidence-number",
+          audit_value("benchmark_training_months")
+        )
+      ),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Rolling forecast RMSE"),
+        span(
+          class = "evidence-number",
+          percent(selected_model$rolling_rmse, accuracy = .1)
+        )
+      ),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Additional post-war change"),
+        span(
+          class = "evidence-number",
+          number(
+            100 * war_coefficient$estimate,
+            accuracy = .1,
+            suffix = " pp"
+          )
+        )
+      ),
       p(
         class = "evidence-takeaway",
-        "Driving rose in March, then slipped slightly below the prior year in April and May. The pattern is mixed—not yet evidence of a large, sustained reduction in driving."
+        paste0(
+          "The post-credit level shift was ",
+          number(100 * credit_coefficient$estimate, accuracy = .1),
+          " percentage points (Newey–West p < 0.001). ",
+          "The additional post-war change was not statistically distinct ",
+          "(p = ", number(war_coefficient$p_value, accuracy = .001), ")."
+        )
       ),
-      span(class = "partial-flag", "May preliminary · June unavailable")
+      span(class = "flag", "Four post-war months · association, not causation")
     )
   })
 
   output$county_plot <- renderPlotly({
-    latest <- county_panel |>
-      filter(quarter_start == latest_quarter, total_ldv_sales >= 100) |>
-      arrange(desc(zev_share)) |>
-      mutate(rank = row_number())
-
-    selected <- if (input$county == "California statewide") character() else input$county
-    displayed <- latest |>
-      filter(rank <= 12 | county %in% selected) |>
+    selected_county <- if (
+      input$county == "Washington statewide"
+    ) character() else input$county
+    display <- wa_county_postwar |>
+      arrange(desc(postwar_new_ldv_titles)) |>
+      mutate(rank = row_number()) |>
+      filter(rank <= 15 | county %in% selected_county) |>
       mutate(
-        county = reorder(county, zev_share),
-        highlight = if_else(as.character(county) %in% selected, "Selected county", "Other county")
+        county = reorder(county, change_percentage_points),
+        direction = if_else(
+          change_percentage_points >= 0,
+          "Higher post-war share",
+          "Lower post-war share"
+        )
       )
-
-    plot <- ggplot(displayed, aes(
-      zev_share, county, fill = highlight,
-      text = paste0(
-        as.character(county), "<br>ZEV share: ",
-        percent(zev_share, accuracy = .1)
+    plot <- ggplot(
+      display,
+      aes(
+        change_percentage_points,
+        county,
+        fill = direction,
+        text = paste0(
+          county,
+          "<br>Change: ",
+          number(change_percentage_points, accuracy = .1),
+          " pp<br>Post-war share: ",
+          percent(postwar_zev_share, accuracy = .1)
+        )
       )
-    )) +
-      geom_col(width = .68) +
-      geom_text(aes(label = percent(zev_share, accuracy = .1)), hjust = -0.12, size = 3.4, color = "#27241f") +
-      scale_fill_manual(values = c("Selected county" = "#b9472e", "Other county" = "#176b68"), guide = "none") +
-      scale_x_continuous(labels = label_percent(), expand = expansion(mult = c(0, .18))) +
-      labs(x = "ZEV share of new light-duty sales", y = NULL,
-           caption = "Counties with fewer than 100 total light-duty sales in the quarter are excluded.") +
+    ) +
+      geom_vline(xintercept = 0, color = muted) +
+      geom_col(width = .7) +
+      scale_fill_manual(values = c(
+        "Higher post-war share" = teal,
+        "Lower post-war share" = rust
+      )) +
+      labs(x = "Change in ZEV title share (percentage points)", y = NULL) +
       theme_editorial()
-
     ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
+
+  output$state_comparison_plot <- renderPlotly({
+    washington_quarterly <- wa_monthly |>
+      filter(month >= as.Date("2023-01-01")) |>
+      mutate(
+        year = as.integer(format(month, "%Y")),
+        quarter = ((as.integer(format(month, "%m")) - 1L) %/% 3L) + 1L,
+        quarter_start = as.Date(paste0(
+          year,
+          "-",
+          sprintf("%02d", 1 + 3 * (quarter - 1L)),
+          "-01"
+        ))
+      ) |>
+      group_by(quarter_start) |>
+      summarise(
+        share = sum(zev_titles) / sum(total_new_ldv_titles),
+        .groups = "drop"
+      ) |>
+      mutate(series = "Washington new-title share")
+    california <- california_quarterly |>
+      transmute(
+        quarter_start,
+        share = zev_share,
+        series = "California CEC sales share"
+      )
+    comparison <- bind_rows(washington_quarterly, california) |>
+      group_by(series) |>
+      mutate(
+        baseline = share[quarter_start == as.Date("2025-10-01")][1],
+        index = 100 * share / baseline
+      ) |>
+      ungroup()
+    plot <- ggplot(
+      comparison,
+      aes(quarter_start, index, color = series, group = series)
+    ) +
+      geom_hline(yintercept = 100, color = muted, linetype = "dotted") +
+      geom_line(linewidth = 1) +
+      geom_point(size = 2) +
+      scale_color_manual(values = c(
+        "Washington new-title share" = teal,
+        "California CEC sales share" = rust
+      )) +
+      scale_x_date(date_breaks = "6 months", labels = quarter_axis) +
+      labs(x = NULL, y = "Index (2025 Q4 = 100)") +
+      theme_editorial()
+    ggplotly(plot, tooltip = c("x", "y", "colour")) |>
       config(displayModeBar = FALSE)
   })
 
   output$conjoint_plot <- renderPlotly({
     display <- conjoint_partworths
     if (input$conjoint_attribute != "All attributes") {
-      display <- display |>
-        filter(attribute == input$conjoint_attribute)
+      display <- display |> filter(attribute == input$conjoint_attribute)
     }
     display <- display |>
       mutate(
@@ -656,23 +668,21 @@ server <- function(input, output, session) {
         level = factor(level, levels = rev(unique(level))),
         hover = paste0(
           attribute, ": ", level,
-          "<br>Utility: ", number(utility, accuracy = 0.01),
+          "<br>Utility: ", number(utility, accuracy = .01),
           "<br>95% interval: ",
-          number(confidence_low, accuracy = 0.01), " to ",
-          number(confidence_high, accuracy = 0.01)
+          number(confidence_low, accuracy = .01), " to ",
+          number(confidence_high, accuracy = .01)
         )
       )
-
     plot <- ggplot(
       display,
       aes(utility, level, color = attribute, text = hover)
     ) +
-      geom_vline(xintercept = 0, color = "#746e64", linetype = "dotted") +
+      geom_vline(xintercept = 0, color = muted, linetype = "dotted") +
       geom_errorbar(
         aes(xmin = confidence_low, xmax = confidence_high),
         orientation = "y",
-        width = .16,
-        linewidth = .7
+        width = .16
       ) +
       geom_point(size = 3) +
       facet_grid(
@@ -681,49 +691,38 @@ server <- function(input, output, session) {
         space = "free_y"
       ) +
       scale_color_manual(values = c(
-        "Brand" = "#176b68",
-        "Fuel economy" = "#8b6b2f",
-        "Price" = "#b9472e"
+        "Brand" = teal,
+        "Fuel economy" = gold,
+        "Price" = rust
       )) +
       labs(
         x = "Part-worth utility (higher = preferred)",
         y = NULL,
-        caption = paste(
-          "Utilities are zero-centered within each attribute.",
-          "Ratings are stated preferences, not purchases."
-        )
+        caption = "Utilities are zero-centered within attribute."
       ) +
       theme_editorial() +
       theme(
         legend.position = "none",
-        strip.text = element_text(
-          color = "#27241f",
-          face = "bold",
-          hjust = 0
-        ),
-        strip.background = element_blank(),
-        panel.spacing.y = grid::unit(1, "lines")
+        strip.text = element_text(face = "bold", hjust = 0),
+        strip.background = element_blank()
       )
-
     ggplotly(plot, tooltip = "text") |>
       config(displayModeBar = FALSE)
   })
 
   output$conjoint_evidence <- renderUI({
-    audit_value <- function(metric_name) {
+    conjoint_audit_value <- function(metric_name) {
       conjoint_audit |>
         filter(metric == metric_name) |>
         pull(value)
     }
-    price_test <- conjoint_attribute_tests |>
-      filter(attribute == "Price")
+    price_test <- conjoint_attribute_tests |> filter(attribute == "Price")
     price_contrast <- conjoint_pairwise |>
       filter(
         attribute == "Price",
         level_1 == "$30,000",
         level_2 == "$120,000"
       )
-
     div(
       class = "evidence-card",
       h3("What the survey supports"),
@@ -733,7 +732,9 @@ server <- function(input, output, session) {
         span(
           class = "evidence-number",
           number(
-            audit_value("survey_ids_with_at_least_one_rating"),
+            conjoint_audit_value(
+              "survey_ids_with_at_least_one_rating"
+            ),
             accuracy = 1
           )
         )
@@ -743,7 +744,7 @@ server <- function(input, output, session) {
         span(class = "evidence-label", "Usable profile ratings"),
         span(
           class = "evidence-number",
-          number(audit_value("complete_ratings"), accuracy = 1)
+          number(conjoint_audit_value("complete_ratings"), accuracy = 1)
         )
       ),
       div(
@@ -757,17 +758,13 @@ server <- function(input, output, session) {
       p(
         class = "evidence-takeaway",
         paste0(
-          "Price was the clearest attribute (cluster-robust p = ",
+          "Price was the clearest attribute (p = ",
           number(price_test$p_value, accuracy = .001),
-          "). Lower-priced profiles were preferred. Brand and fuel economy ",
-          "cannot be cleanly separated because Tesla was always paired with ",
-          "110 MPGe and never with 20 or 35 MPG."
+          "). Brand and fuel economy cannot be cleanly separated because ",
+          "Tesla was consistently paired with 110 MPGe."
         )
       ),
-      span(
-        class = "partial-flag",
-        "Small class sample · stated ratings · directional evidence"
-      )
+      span(class = "flag", "Small class sample · stated ratings")
     )
   })
 }

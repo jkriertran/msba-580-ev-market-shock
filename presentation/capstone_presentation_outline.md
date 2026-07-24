@@ -1,102 +1,71 @@
-# Capstone Presentation Outline
+# Washington Capstone Presentation Outline
 
-Target length: 12 minutes, followed by 3 minutes of questions. Assign at least
-one speaking section and one anticipated question to every group member.
+Target: 12 minutes plus 3 minutes of questions. Assign every group member at
+least one speaking section and one anticipated question.
 
-## 1. Business decision and answer — 1:00
+## 1. Decision and answer — 1:00
 
-- Decision-maker: California EV manufacturers, dealers, and marketing managers.
-- Question: Did early-2026 fuel pressure produce a durable EV-demand rebound
-  after the federal tax-credit expiration?
-- Lead with the answer: the share recovered from its Q1 low but was only 0.19
-  percentage points above the immediate post-credit baseline.
+- Question: Did higher gasoline prices revive Washington ZEV demand after the
+  federal credit expired?
+- Answer: title share increased only 0.56 points; the additional modeled
+  post-war change is not statistically distinct.
 
 ## 2. Data and definitions — 1:30
 
-- Define new light-duty ZEV sales and distinguish them from all light-duty
-  sales.
-- Introduce CEC sales, EIA gasoline prices, Google Trends, economic controls,
-  and FHWA/state-reported VMT.
-- Introduce the anonymous conjoint survey: 18 rated respondents and 123 profile
-  ratings.
-- Explain the official statewide `Out Of State` mailing-address category.
+- Explain original titles versus dealer sales.
+- Show why both `Original Title` and `New` filters are required.
+- Define light-duty and ZEV filters.
+- Introduce 114 Washington months, EIA gasoline prices, California comparison,
+  and the conjoint survey.
 
-## 3. Live Shiny demonstration — 2:00
+## 3. Shiny demonstration — 2:00
 
-1. Change the comparison quarter and explain why the indexed lines all equal
-   100 in that selected quarter.
-2. Hover over the Plotly timeline and context points.
-3. Toggle policy and war markers.
-4. Compare statewide and county ZEV share.
-5. Show the year-over-year VMT response.
-6. Filter the conjoint utilities to Price and hover over the confidence
-   intervals.
+1. Change the timeline from 2021 to the full 2017 history.
+2. Switch ZEV share to gasoline price.
+3. Select King, Pierce, or Clark County.
+4. Hover over the regression benchmark.
+5. Filter conjoint utilities to Price.
 
-## 4. Technique 1: event sequence and benchmark — 2:00
+## 4. Technique 1: regression benchmark — 2:00
 
-- Show the 2025 Q3 pull-forward, post-credit decline, 2026 Q1 low, and Q2
-  rebound.
-- Explain the pre-event time-plus-season regression benchmark.
-- Report the 3.38-percentage-point 2026 Q2 shortfall and wide prediction
-  interval.
-- State the diagnostics: 10 training quarters, five residual degrees of
-  freedom, one influential observation, and no model-selection advantage for
-  the richer specification.
+- Compare seasonal-only, linear, and quadratic models.
+- Explain 42 rolling one-month-ahead validations.
+- Report selected RMSE: 3.66 percentage points.
+- Show observed post-war share of 14.5% versus expected 25.7%.
 
-## 5. Technique 2: county segmentation — 1:45
+## 5. Technique 2: interrupted time series — 1:30
 
-- Show the baseline-share versus change scatterplot.
-- Describe the three segments:
-  - large established EV markets;
-  - low-adoption/stalled markets;
-  - small-market/fast-rebound markets.
-- Explain that silhouette width near 0.34 means the segments are useful
-  summaries, not sharply separated natural groups.
+- Post-credit coefficient: −11.59 points, p < 0.001.
+- Additional post-war coefficient: +1.15 points, p = 0.285.
+- Explain Newey–West uncertainty and why the model is not causal.
 
-## 6. Behavioral response — 1:00
+## 6. County and California evidence — 1:15
 
-- March through May 2026 VMT changes were +3.5%, -0.8%, and -0.1%.
-- Conclude that current evidence does not show a large, sustained reduction in
-  driving.
-- Flag preliminary May data and unavailable June data.
+- 32 of 39 counties increased; median change +3.34 points.
+- Highlight Pierce, Snohomish, Clark, and King.
+- Use California only as a directional quarterly comparison.
 
-## 7. Technique 3: stated preferences — 1:00
+## 7. Technique 3: conjoint — 1:00
 
-- Explain that this is a rating-based part-worth model with respondent fixed
-  effects and respondent-clustered uncertainty.
-- Price was the clearest attribute (p = 0.013); $30,000 scored 1.30 preference
-  points above $120,000 (p = 0.005).
-- State the design limitation plainly: Tesla and 110 MPGe are confounded, so
-  brand and fuel economy cannot be cleanly separated.
+- 18 rated respondents and 123 profile ratings.
+- Price was clearest: $30,000 versus $120,000 difference = 1.30 points.
+- Explain brand–fuel-economy confounding.
 
-## 8. Recommendations — 1:00
+## 8. Recommendations and close — 1:45
 
-- Maintain inventory and conversion campaigns in established high-volume
-  markets.
-- Diagnose charging, affordability, and awareness barriers in stalled markets.
-- Use light-touch campaigns in fast-growing small markets and avoid reacting to
-  volatile rates.
-- Lead with affordability and ownership cost; do not make a brand-specific
-  claim from this survey.
-- Continue monthly leading-indicator tracking before making a statewide bet.
+- Avoid a statewide inventory bet.
+- Lead with affordability and total cost.
+- Target large counties with positive movement.
+- Update the model as later DOL months arrive.
+- Close: fuel pressure raised attention, but current title data do not show a
+  distinct statewide recovery.
 
-## 9. Limitations, next step, and close — 1:15
+## Q&A preparation
 
-- Do not claim the war caused the rebound.
-- Name the overlapping tax, price, interest-rate, manufacturer-incentive, and
-  seasonal effects.
-- Explain the conjoint sample-size, missing-rating, and attribute-confounding
-  limitations.
-- Close by restating the decision answer in one sentence.
-
-## Q&A preparation — 3:00
-
-Prepare concise responses to:
-
-1. Why use share instead of sales counts?
-2. Why is 2025 Q4 the main comparison?
-3. Why is the regression not causal?
-4. Why choose three clusters when five has a marginally higher silhouette?
-5. Does rising search interest represent actual demand?
-6. Why is this rating-based model not a conditional logit?
-7. Why did you avoid willingness-to-pay and simulated-choice claims?
+1. Why are titles not the same as sales?
+2. Why does the post-credit title period begin in November?
+3. Why select a quadratic trend?
+4. What does Newey–West correct?
+5. Why is Washington now primary and California secondary?
+6. Why does a positive coefficient not prove the war caused the change?
+7. Why are conjoint brand and fuel-economy results confounded?

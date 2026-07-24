@@ -1,6 +1,6 @@
 ---
-title: "California EV Demand After Two Market Shocks"
-subtitle: "Tax-credit expiration, fuel pressure, and the 2026 rebound"
+title: "Washington ZEV Demand After Two Market Shocks"
+subtitle: "Monthly title transactions, fuel pressure, and stated preferences"
 author: "MSBA 580 Project Group"
 date: "`r format(Sys.Date(), '%B %Y')`"
 output:
@@ -13,20 +13,17 @@ output:
 ```{r setup, include=FALSE}
 report_path <- normalizePath(knitr::current_input(dir = TRUE), mustWork = TRUE)
 project_root <- normalizePath(file.path(dirname(report_path), ".."), mustWork = TRUE)
-analysis_script <- file.path(project_root, "scripts", "run_descriptive_analysis.R")
-analysis_status <- system2(file.path(R.home("bin"), "Rscript"), analysis_script)
-if (analysis_status != 0L) stop("The analysis pipeline did not complete.")
-conjoint_script <- file.path(project_root, "scripts", "run_conjoint_analysis.R")
-conjoint_status <- system2(file.path(R.home("bin"), "Rscript"), conjoint_script)
-if (conjoint_status != 0L) stop("The conjoint pipeline did not complete.")
+for (script_name in c("run_washington_analysis.R", "run_conjoint_analysis.R")) {
+  status <- system2(
+    file.path(R.home("bin"), "Rscript"),
+    file.path(project_root, "scripts", script_name)
+  )
+  if (status != 0L) stop(script_name, " did not complete.")
+}
 
 knitr::opts_chunk$set(
-  echo = FALSE,
-  warning = FALSE,
-  message = FALSE,
-  fig.width = 9,
-  fig.height = 5,
-  dpi = 120
+  echo = FALSE, warning = FALSE, message = FALSE,
+  fig.width = 9, fig.height = 5, dpi = 120
 )
 library(ggplot2)
 library(scales)
@@ -38,33 +35,21 @@ read_result <- function(file_name) {
     check.names = FALSE
   )
 }
+monthly <- read_result("washington_monthly_analysis.csv")
+monthly$month <- as.Date(monthly$month)
+events <- read_result("washington_event_summary.csv")
+its <- read_result("washington_its_coefficients.csv")
+county <- read_result("washington_county_postwar.csv")
+models <- read_result("washington_model_comparison.csv")
+conjoint <- read_result("conjoint_partworths.csv")
 
-quarterly <- read.csv(
-  file.path(project_root, "data", "quarterly_controls.csv"),
-  stringsAsFactors = FALSE
-)
-quarterly$quarter_start <- as.Date(quarterly$quarter_start)
-benchmark <- read_result("seasonal_benchmark.csv")
-benchmark$quarter_start <- as.Date(benchmark$quarter_start)
-segments <- read_result("county_segments.csv")
-segment_profiles <- read_result("county_segment_profiles.csv")
-model_comparison <- read_result("regression_model_comparison.csv")
-diagnostics <- read_result("regression_diagnostics.csv")
-conjoint_partworths <- read_result("conjoint_partworths.csv")
-conjoint_tests <- read_result("conjoint_attribute_tests.csv")
-conjoint_pairwise <- read_result("conjoint_pairwise_contrasts.csv")
-vmt <- read.csv(
-  file.path(project_root, "data", "california_vmt_monthly.csv"),
-  stringsAsFactors = FALSE
-)
-vmt$observation_month <- as.Date(vmt$observation_month)
+postwar <- events[events$period == "Post-war", ]
+prewar <- events[events$period == "Post-credit / pre-war", ]
+war_effect <- its[its$term == "post_war", ]
+credit_effect <- its[its$term == "post_credit", ]
 
-paper <- "#f6f1e7"
-ink <- "#27241f"
-teal <- "#176b68"
-rust <- "#b9472e"
-gold <- "#8b6b2f"
-
+paper <- "#f6f1e7"; ink <- "#27241f"; teal <- "#176b68"
+rust <- "#b9472e"; gold <- "#8b6b2f"
 report_theme <- theme_minimal(base_size = 12) +
   theme(
     plot.background = element_rect(fill = paper, color = NA),
@@ -77,228 +62,147 @@ report_theme <- theme_minimal(base_size = 12) +
     legend.position = "top",
     legend.title = element_blank()
   )
-
-quarter_date_label <- function(x) {
-  paste0(format(x, "%Y"), " Q", ((as.integer(format(x, "%m")) - 1L) %/% 3L) + 1L)
-}
 ```
 
 # Executive report
 
 ## Decision question
 
-California EV manufacturers, dealers, and marketing managers need to decide
-whether the early-2026 gasoline-price shock created a durable EV sales
-opportunity after the federal purchase credit expired in September 2025. We ask:
-**Did California's zero-emission vehicle (ZEV) market rebound as fuel pressure
-increased, and was the rebound large enough to offset the post-credit decline?**
-We also examine whether Californians reduced driving and whether counties
-followed distinct response patterns.
+Washington vehicle manufacturers, dealers, and policy analysts need to know
+whether the early-2026 gasoline-price shock produced a meaningful ZEV-demand
+rebound after the federal purchase credit expired in September 2025. We ask:
+**Did Washington's share of new light-duty ZEV title transactions rise after
+the war, and was that movement distinguishable from the post-credit market?**
 
-California's ZEV share recovered from its 2026 Q1 low, but by Q2 it was only
-0.19 percentage points above the post-credit 2025 Q4 level. The rebound
-coincided with higher gasoline prices and EV search interest, but cannot prove
-causation. VMT provides mixed evidence of reduced driving. Managers should
-treat the period as renewed attention, not a permanent demand shift.
+The answer is cautious. Washington's pooled ZEV-title share increased from
+13.9% in November 2025–February 2026 to 14.5% in March–June 2026, a 0.56-point
+increase, while average regular gasoline prices rose 33.8%. An interrupted
+time-series model estimates an additional post-war change of 1.15 percentage
+points, but it is not statistically distinct from zero (Newey–West p = 0.285).
+The evidence does not yet show that fuel pressure restored the demand lost
+after the credit expired.
 
-## Data and analytical approach
+## Data and definitions
 
-The project combines independently sourced public data. California Energy
-Commission records provide quarterly new light-duty ZEV and total light-duty
-sales statewide and by county. ZEVs include battery electric, plug-in hybrid,
-and hydrogen fuel-cell vehicles; they exclude used and medium- or heavy-duty
-vehicles. EIA data supply gasoline prices; Google Trends supplies relative
-interest, not search counts; and FHWA Traffic Volume Trends supplies monthly
-statewide VMT.
+The primary source is the Washington Department of Licensing's public
+[Vehicle Title Transactions](https://data.wa.gov/Transportation/Vehicle-Title-Transactions-by-Department-of-Licens/cdk6-5kdf)
+API. The pipeline uses 114 consecutive months from January 2017 through June
+2026. It requires original titles, the DOL new-vehicle flag, Washington owner
+state, passenger cars/multipurpose vehicles/light trucks, and light-duty weight
+classes. ZEVs include BEVs, PHEVs, and hydrogen fuel-cell vehicles.
 
-The observed-market analysis uses two major techniques. First, a pre-event regression benchmark
-fits a linear time trend and calendar-quarter indicators to 2023 Q1 through
-2025 Q2, then compares later observations with predictions. We compare that
-specification with simpler alternatives using small-sample AICc and
-leave-one-out error and report robust and influence diagnostics.
+This measure is a registration transaction, not a dealer sale date. Title
+processing can lag purchase timing, so October 2025 remains in the
+credit-pull-forward/processing period and the modeled post-credit period begins
+in November. Washington gasoline prices come from the
+[U.S. Energy Information Administration](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=EMM_EPMR_PTE_SWA_DPG).
+California Energy Commission quarterly sales are retained only as a neighboring
+comparison because their timing and construction differ.
 
-Second, k-means segmentation groups the 58 California county mailing-address
-categories using standardized 2025 Q4 ZEV share, the change through 2026 Q2,
-and log average quarterly light-duty sales. We inspect two through six clusters
-using mean silhouette width and select three for parsimony and business
-interpretability. The silhouette near 0.34 indicates only moderate separation,
-so these are descriptive archetypes rather than permanent county types.
+## Analytical methods
 
-Third, a rating-based conjoint model analyzes 123 completed profile ratings
-from 18 respondents. Ratings are reversed so higher scores mean greater
-preference, then modeled with effect-coded attributes, respondent fixed
-effects, and respondent-clustered standard errors.
+The first technique is a pre-event regression benchmark trained through June
+2025. We compare seasonal-only, linear-time, and quadratic-time models, each
+including calendar-month effects and a COVID disruption indicator. Rolling
+one-month-ahead validation covers 42 months. The quadratic specification has
+the lowest RMSE, 3.66 percentage points, narrowly outperforming the linear
+model's 3.78 points.
 
-## What changed?
+The second specification is an interrupted time series using all 114 months.
+It adds post-credit and post-war level indicators to the quadratic trend,
+seasonality, and COVID control. Newey–West standard errors address residual
+autocorrelation. Event coefficients describe deviations associated with each
+period; they do not identify causal effects.
 
-ZEV share reached 28.3% in 2025 Q3 as purchases were likely pulled forward
-before the federal credit expired. It then fell 9.43 percentage points to 18.9%
-in 2025 Q4, a 33.3% relative decline, and fell again to 15.8% in 2026 Q1. The
-share rebounded 3.33 percentage points to 19.1% in 2026 Q2. Thus, the full
-post-war quarter recovered the first-quarter loss but did not meaningfully
-exceed the immediate post-credit baseline.
+Monthly Washington titles materially improve the study design over the earlier
+California-only quarterly approach. They provide enough pre-event history to
+estimate recurring seasonal patterns, reserve 42 months for rolling forecast
+validation, and distinguish the credit transition from the later war period.
+The county panel then tests whether the statewide change was geographically
+broad or driven by one large market. California is not pooled into the
+regression: it serves only as a directional comparison because California
+reports inferred sales while Washington reports title transactions.
 
-```{r statewide-benchmark, fig.cap="Observed statewide ZEV share and the pre-event time-plus-season benchmark."}
-ggplot(benchmark, aes(quarter_start)) +
+```{r benchmark, fig.cap="Observed Washington ZEV-title share and the pre-credit benchmark."}
+display <- monthly[monthly$month >= as.Date("2021-01-01"), ]
+ggplot(display, aes(month)) +
   geom_ribbon(
-    aes(ymin = prediction_low, ymax = prediction_high),
-    fill = teal, alpha = 0.12
+    aes(ymin = empirical_prediction_low, ymax = empirical_prediction_high),
+    fill = teal, alpha = .12
   ) +
-  geom_line(aes(y = expected_zev_share), color = gold, linewidth = 0.9) +
-  geom_line(aes(y = observed_zev_share), color = teal, linewidth = 1.1) +
-  geom_point(aes(y = observed_zev_share), color = rust, size = 2.4) +
-  geom_vline(
-    xintercept = as.Date("2025-09-30"),
-    color = rust, linetype = "dashed"
-  ) +
+  geom_line(aes(y = expected_zev_share, color = "Expected"), linewidth = .9) +
+  geom_line(aes(y = zev_share, color = "Observed"), linewidth = 1.05) +
+  geom_vline(xintercept = as.Date("2025-11-01"), color = rust, linetype = "dashed") +
+  geom_vline(xintercept = as.Date("2026-03-01"), color = rust, linetype = "dotted") +
+  scale_color_manual(values = c("Expected" = gold, "Observed" = teal)) +
   scale_y_continuous(labels = label_percent(accuracy = 1)) +
-  scale_x_date(date_breaks = "6 months", labels = quarter_date_label) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
   labs(
-    title = "The 2026 Q2 rebound remained below the benchmark",
-    subtitle = "Shading is a 95% prediction interval; dashed line marks credit expiration",
-    x = NULL,
-    y = "ZEV share"
+    title = "ZEV title share remained below its pre-credit trajectory",
+    x = NULL, y = "New light-duty ZEV title share"
   ) +
   report_theme
 ```
 
-The benchmark expected 22.5% in 2026 Q2, 3.38 points above observed, although
-the observation remained inside its 17.7%–27.3% prediction interval. With only
-10 training quarters, one influential observation, and simpler models
-performing better on some criteria, this is a visualization—not a causal
-counterfactual.
+## Findings
 
-Between 2025 Q4 and 2026 Q2, average California regular gasoline prices rose
-32.0%, from $4.34 to $5.73 per gallon, and Google Trends interest in “electric
-vehicle” rose 140%. Attention clearly increased, but a normalized search index
-cannot measure the number or purchase intent of searchers.
+The benchmark expected a pooled 25.7% ZEV-title share during March–June 2026,
+11.2 points above the observed 14.5%. The interrupted model estimates a
+post-credit level shift of −11.59 points (p < 0.001). Its additional post-war
+coefficient is positive but uncertain: +1.15 points with a 95% interval from
+−0.97 to +3.28 points.
 
-## Geographic and behavioral response
+Gasoline prices averaged $3.90 per gallon in the four post-credit/pre-war
+months and $5.22 during the four post-war months. Thus, higher fuel costs
+coincided with only a small title-share increase. This is inconsistent with a
+large immediate fuel-price-driven recovery, although purchasing and title
+processing may respond with longer lags.
 
-Forty-nine of 58 counties increased ZEV share, with a median increase of 2.35
-percentage points. The official statewide result includes an “Out of State”
-mailing-address category; excluding that category raises the aggregate change
-from 0.19 to 1.27 percentage points. The official measure remains primary, and
-the county-only calculation is a sensitivity check.
+County patterns were more favorable but heterogeneous. Thirty-two of 39
+counties increased ZEV-title share, and the median change was +3.34 points.
+Among large markets, Pierce gained 4.70 points, Snohomish 4.51, and Clark 6.90,
+while King declined 3.18. County results exclude the DOL's “Unknown or Out of
+State” category and should not be treated as independent statewide experiments.
 
-```{r county-segments, fig.cap="County segment positions; point size represents average quarterly light-duty sales."}
-ggplot(
-  segments,
-  aes(
-    100 * zev_share_2025_q4,
-    change_percentage_points,
-    size = average_quarterly_ldv_sales,
-    color = segment
-  )
-) +
-  geom_hline(yintercept = 0, color = "#746e64", linetype = "dotted") +
-  geom_point(alpha = 0.8) +
-  scale_size_area(max_size = 13, labels = label_comma()) +
-  scale_color_manual(values = c(
-    "Large established EV markets" = teal,
-    "Low-adoption / stalled" = rust,
-    "Small-market / fast rebound" = gold
-  )) +
-  labs(
-    title = "County markets followed three broad response patterns",
-    x = "2025 Q4 ZEV share (%)",
-    y = "Change to 2026 Q2 (percentage points)",
-    size = "Average quarterly sales"
-  ) +
-  report_theme
-```
-
-The 27 large established markets average a 2.03-point gain. The 16
-low-adoption/stalled counties decline 0.36 points. Fifteen small markets average
-a 6.09-point rebound, but small denominators magnify movements.
-
-VMT does not show a large sustained driving reduction. March, April, and May
-2026 changed +3.5%, -0.8%, and -0.1% from the same months a year earlier. The
-three-month mean was +0.87%; May is preliminary and June was unavailable.
-
-```{r vmt-response, fig.cap="Monthly change from the same month one year earlier."}
-vmt_display <- vmt[vmt$observation_month >= as.Date("2024-01-01"), ]
-vmt_display$direction <- ifelse(
-  vmt_display$yoy_change >= 0, "More driving", "Less driving"
+```{r county, fig.cap="Change in ZEV-title share for the 15 largest county markets."}
+county_display <- head(county[order(-county$postwar_new_ldv_titles), ], 15)
+county_display$county <- reorder(
+  county_display$county,
+  county_display$change_percentage_points
 )
-ggplot(vmt_display, aes(observation_month, yoy_change, fill = direction)) +
-  geom_hline(yintercept = 0, color = "#746e64") +
-  geom_col(width = 24) +
-  geom_vline(
-    xintercept = as.Date("2026-02-28"),
-    color = rust, linetype = "dashed"
-  ) +
-  scale_fill_manual(values = c("More driving" = teal, "Less driving" = rust)) +
-  scale_y_continuous(labels = label_percent(accuracy = 1)) +
-  scale_x_date(date_breaks = "3 months", date_labels = "%Y\n%b") +
+ggplot(county_display, aes(change_percentage_points, county)) +
+  geom_vline(xintercept = 0, color = "#746e64") +
+  geom_col(aes(fill = change_percentage_points >= 0), show.legend = FALSE) +
+  scale_fill_manual(values = c("TRUE" = teal, "FALSE" = rust)) +
   labs(
-    title = "Early post-war driving evidence is mixed",
-    x = NULL,
-    y = "Year-over-year VMT change"
+    title = "Most large counties improved, but King County did not",
+    x = "Post-war change (percentage points)", y = NULL
   ) +
   report_theme
 ```
 
-## Stated preferences
+The rating-based conjoint survey adds stated-preference evidence from 123
+ratings supplied by 18 respondents. Price is the clearest attribute
+(cluster-robust p = 0.013): a $30,000 profile scores 1.30 preference points
+above a $120,000 profile (p = 0.005). Brand and fuel economy cannot be cleanly
+separated because Tesla was consistently paired with 110 MPGe.
 
-The survey provides complementary stated-preference evidence. Price was the
-clearest attribute (cluster-robust p = 0.013): a $30,000 profile scored 1.30
-points above a $120,000 profile (p = 0.005). Tesla was paired almost exclusively
-with 110 MPGe, so brand and fuel economy cannot be cleanly separated.
+## Recommendations and limitations
 
-```{r conjoint-utilities, fig.cap="Rating-based conjoint part-worth utilities with respondent-clustered 95% intervals."}
-conjoint_partworths$level <- factor(
-  conjoint_partworths$level,
-  levels = rev(conjoint_partworths$level)
-)
-ggplot(conjoint_partworths, aes(utility, level, color = attribute)) +
-  geom_vline(xintercept = 0, color = "#746e64", linetype = "dotted") +
-  geom_errorbar(
-    aes(xmin = confidence_low, xmax = confidence_high),
-    width = 0.16,
-    orientation = "y"
-  ) +
-  geom_point(size = 2.7) +
-  facet_wrap(~attribute, scales = "free_y", ncol = 1) +
-  scale_color_manual(values = c(
-    "Brand" = teal, "Fuel economy" = gold, "Price" = rust
-  )) +
-  labs(
-    title = "Affordability produced the clearest preference signal",
-    subtitle = "Positive utilities indicate greater stated preference",
-    x = "Part-worth utility (preference-score points)",
-    y = NULL
-  ) +
-  report_theme
-```
+Managers should avoid a broad Washington inventory expansion based on four
+post-war months. Prioritize affordability and total-cost messaging, then monitor
+whether title share continues improving as gasoline prices remain elevated.
+County-level campaigns are more defensible in markets showing both scale and
+positive movement, such as Pierce, Snohomish, and Clark.
 
-## Managerial recommendations
-
-Managers should not make a statewide inventory bet based on one post-war
-quarter. In large established EV markets, maintain inventory availability and
-use fuel-cost messaging to convert renewed search interest. In low-adoption
-counties, diagnose charging access, affordability, and awareness before adding
-inventory. In small fast-rebound markets, use light-touch campaigns and avoid
-overreacting to volatile percentage changes. The survey supports emphasizing
-affordability and total ownership cost, but not a brand-specific conclusion.
-Continue monthly leading-indicator tracking and re-estimate the benchmark when
-more quarters become available.
-
-## Limitations and next analysis
-
-The study is observational and cannot separate the war, gasoline prices, tax
-policy, interest rates, manufacturer incentives, seasonality, and vehicle
-prices. County observations share the same statewide environment and are not
-independent replications of the shock. Google Trends is relative, VMT is
-incomplete for 2026 Q2, and the sales series has only one complete post-war
-quarter. The conjoint sample is small, uses ratings rather than forced choices,
-and has 17 missing ratings. Its brand–fuel-economy confounding prevents clean
-attribute separation, so we do not report willingness to pay or simulated
-choice shares.
+The study is observational. Federal policy, manufacturer incentives, interest
+rates, vehicle prices, model availability, title-processing delays, and the war
+overlap. The post-war period is short, rolling forecast error is material, and
+the conjoint sample is small and partially confounded. Later DOL releases are
+needed before claiming a durable rebound.
 
 ## Sources
 
+- [Washington Department of Licensing title transactions](https://data.wa.gov/Transportation/Vehicle-Title-Transactions-by-Department-of-Licens/cdk6-5kdf)
+- [EIA Washington regular gasoline prices](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=EMM_EPMR_PTE_SWA_DPG)
 - [California Energy Commission ZEV sales](https://www.energy.ca.gov/data-reports/energy-almanac/zero-emission-vehicle-and-infrastructure-statistics-collection/new-zev)
-- [U.S. Energy Information Administration gasoline prices](https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_sca_w.htm)
-- [Google Trends](https://trends.google.com/trends/)
-- [FHWA Traffic Volume Trends](https://www.fhwa.dot.gov/policyinformation/travel_monitoring/tvt.cfm)
