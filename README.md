@@ -11,11 +11,26 @@ Did rising fuel pressure after the February 2026 Iran war coincide with an EV-de
 ## Run the app
 
 ```r
-install.packages(c("shiny", "dplyr", "ggplot2", "readr", "scales", "tidyr"))
+install.packages(c(
+  "shiny", "dplyr", "ggplot2", "plotly", "readr", "rmarkdown",
+  "scales", "tidyr"
+))
 shiny::runApp()
 ```
 
-Required packages: `shiny`, `dplyr`, `ggplot2`, `readr`, `scales`, and `tidyr`.
+Required packages: `shiny`, `dplyr`, `ggplot2`, `plotly`, `readr`,
+`rmarkdown`, `scales`, and `tidyr`. The recommended `cluster` package ships
+with standard R installations and is used by the analytical pipeline.
+
+## Rebuild the analysis and report
+
+```r
+system("Rscript scripts/run_descriptive_analysis.R")
+rmarkdown::render("report/final_report.Rmd")
+```
+
+The rendered report is also available at
+[`report/final_report.html`](report/final_report.html).
 
 ## Repository contents
 
@@ -32,14 +47,20 @@ Required packages: `shiny`, `dplyr`, `ggplot2`, `readr`, `scales`, and `tidyr`.
 - `analysis/preliminary_findings.md`: current effect sizes, interpretation, and
   presentation-ready conclusion.
 - `analysis/results/`: reproducible analytical output tables.
+- `report/final_report.Rmd`: reproducible 800–1,000-word capstone report with
+  regression, segmentation, recommendations, and a conjoint placeholder.
+- `report/final_report.html`: rendered report ready for review or RPubs upload.
 - `feedback/`: formal peer-feedback templates and received/given critique.
-- `presentation/`: presentation outline and demo sequence.
+- `presentation/`: mini-project and 12-minute capstone presentation outlines.
 - `docs/methodology.md`: analytical definitions, transformations, and limitations.
 
 ## Draft feature checklist
 
 - Four interactive inputs: geography, primary signal, comparison quarter, and event-marker toggle.
-- Six reactive output groups: KPI strip, market timeline, normalized context chart, dynamic interpretation, driving-response evidence, and county benchmark.
+- Six reactive output groups: KPI strip, market timeline, normalized context
+  chart, dynamic interpretation, driving-response evidence, and county
+  benchmark.
+- Four interactive Plotly charts with point-level hover details.
 - Cleaned, project-produced California EV and market-control data.
 - A clear analytical question and visible interpretation guardrail.
 
@@ -74,6 +95,7 @@ post-critique decisions will be documented before the final release.
 | The app only showed vehicle purchases, not whether consumers responded to fuel pressure by driving less. | Accepted | Added a monthly California VMT section with year-over-year bars, post-war evidence values, and data-completeness warnings. | Adds a second behavioral channel while controlling visually for normal seasonal travel patterns. |
 | The context-chart y-axis title is clipped, and the selected index baseline is easy to mistake for the first observation. | Accepted | Shortened the y-axis title, increased its left margin, named the selected baseline in the subtitle, and added a vertical baseline marker with highlighted 100-index points. | Makes clear that every series equals 100 in the selected comparison quarter rather than at the beginning of the chart. |
 | The behavior-response y-axis title is clipped, and the comparison level is not explicit. | Accepted | Shortened the y-axis title, increased the left margin, and rewrote the subtitle to define the 0% year-over-year line and the meaning of positive and negative bars. | Makes the chart readable and distinguishes its year-over-year comparison from the indexed baseline used in the context chart. |
+| The capstone guide requires at least three interactive Plotly visualizations. | Accepted | Converted the market timeline, indexed context chart, VMT response chart, and county benchmark to Plotly with hover details. | Meets the interaction requirement while preserving the app's established visual design. |
 
 ## Version workflow
 

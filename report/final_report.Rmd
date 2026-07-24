@@ -1,0 +1,271 @@
+---
+title: "California EV Demand After Two Market Shocks"
+subtitle: "Tax-credit expiration, fuel pressure, and the 2026 rebound"
+author: "MSBA 580 Project Group"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+report_path <- normalizePath(knitr::current_input(dir = TRUE), mustWork = TRUE)
+project_root <- normalizePath(file.path(dirname(report_path), ".."), mustWork = TRUE)
+analysis_script <- file.path(project_root, "scripts", "run_descriptive_analysis.R")
+analysis_status <- system2(file.path(R.home("bin"), "Rscript"), analysis_script)
+if (analysis_status != 0L) stop("The analysis pipeline did not complete.")
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 5,
+  dpi = 120
+)
+library(ggplot2)
+library(scales)
+
+read_result <- function(file_name) {
+  read.csv(
+    file.path(project_root, "analysis", "results", file_name),
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+}
+
+quarterly <- read.csv(
+  file.path(project_root, "data", "quarterly_controls.csv"),
+  stringsAsFactors = FALSE
+)
+quarterly$quarter_start <- as.Date(quarterly$quarter_start)
+benchmark <- read_result("seasonal_benchmark.csv")
+benchmark$quarter_start <- as.Date(benchmark$quarter_start)
+segments <- read_result("county_segments.csv")
+segment_profiles <- read_result("county_segment_profiles.csv")
+model_comparison <- read_result("regression_model_comparison.csv")
+diagnostics <- read_result("regression_diagnostics.csv")
+vmt <- read.csv(
+  file.path(project_root, "data", "california_vmt_monthly.csv"),
+  stringsAsFactors = FALSE
+)
+vmt$observation_month <- as.Date(vmt$observation_month)
+
+paper <- "#f6f1e7"
+ink <- "#27241f"
+teal <- "#176b68"
+rust <- "#b9472e"
+gold <- "#8b6b2f"
+
+report_theme <- theme_minimal(base_size = 12) +
+  theme(
+    plot.background = element_rect(fill = paper, color = NA),
+    panel.background = element_rect(fill = paper, color = NA),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text = element_text(color = ink),
+    axis.title = element_text(color = ink, face = "bold"),
+    plot.title = element_text(face = "bold", color = ink),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
+
+quarter_date_label <- function(x) {
+  paste0(format(x, "%Y"), " Q", ((as.integer(format(x, "%m")) - 1L) %/% 3L) + 1L)
+}
+```
+
+# Executive report
+
+## Decision question
+
+California EV manufacturers, dealers, and marketing managers need to decide
+whether the early-2026 gasoline-price shock created a durable EV sales
+opportunity after the federal purchase credit expired in September 2025. We ask:
+**Did California's zero-emission vehicle (ZEV) market rebound as fuel pressure
+increased, and was the rebound large enough to offset the post-credit decline?**
+We also examine whether Californians reduced driving and whether counties
+followed distinct response patterns.
+
+The answer is cautious. California's official ZEV share recovered from its
+2026 Q1 low, but by 2026 Q2 it was only 0.19 percentage points above the
+immediate post-credit 2025 Q4 level. The rebound coincided with sharply higher
+gasoline prices and much greater EV search interest, yet the quarterly record
+cannot show that either caused purchases. Vehicle-miles traveled (VMT) provides
+mixed evidence of reduced driving. Managers should treat the period as renewed
+consumer attention, not proof of a permanent demand shift.
+
+## Data and analytical approach
+
+The project combines independently sourced public data. California Energy
+Commission records provide quarterly new light-duty ZEV and total light-duty
+sales statewide and by county. ZEVs include battery electric, plug-in hybrid,
+and hydrogen fuel-cell vehicles; they exclude used and medium- or heavy-duty
+vehicles. U.S. Energy Information Administration data supply California regular
+gasoline prices. Google Trends supplies a normalized relative search-interest
+index, not search counts. FHWA Traffic Volume Trends, based on state-reported
+counts, supplies monthly statewide VMT. Economic controls are retained in the
+project dataset for context.
+
+We use two major analytical techniques. First, a pre-event regression benchmark
+fits a linear time trend and calendar-quarter indicators to 2023 Q1 through
+2025 Q2, then compares later observations with predictions. We compare that
+specification with mean-only, time-only, and seasonal-only alternatives using
+small-sample AICc and leave-one-out error. We also report HC1 robust standard
+errors, residual normality, an approximate Durbin-Watson statistic, Cook's
+distance, and leave-one-out RMSE.
+
+Second, k-means segmentation groups the 58 California county mailing-address
+categories using standardized 2025 Q4 ZEV share, the change through 2026 Q2,
+and log average quarterly light-duty sales. We inspect two through six clusters
+using mean silhouette width and select three for parsimony and business
+interpretability. The silhouette near 0.34 indicates only moderate separation,
+so these are descriptive archetypes rather than permanent county types.
+
+## What changed?
+
+ZEV share reached 28.3% in 2025 Q3 as purchases were likely pulled forward
+before the federal credit expired. It then fell 9.43 percentage points to 18.9%
+in 2025 Q4, a 33.3% relative decline, and fell again to 15.8% in 2026 Q1. The
+share rebounded 3.33 percentage points to 19.1% in 2026 Q2. Thus, the full
+post-war quarter recovered the first-quarter loss but did not meaningfully
+exceed the immediate post-credit baseline.
+
+```{r statewide-benchmark, fig.cap="Observed statewide ZEV share and the pre-event time-plus-season benchmark."}
+ggplot(benchmark, aes(quarter_start)) +
+  geom_ribbon(
+    aes(ymin = prediction_low, ymax = prediction_high),
+    fill = teal, alpha = 0.12
+  ) +
+  geom_line(aes(y = expected_zev_share), color = gold, linewidth = 0.9) +
+  geom_line(aes(y = observed_zev_share), color = teal, linewidth = 1.1) +
+  geom_point(aes(y = observed_zev_share), color = rust, size = 2.4) +
+  geom_vline(
+    xintercept = as.Date("2025-09-30"),
+    color = rust, linetype = "dashed"
+  ) +
+  scale_y_continuous(labels = label_percent(accuracy = 1)) +
+  scale_x_date(date_breaks = "6 months", labels = quarter_date_label) +
+  labs(
+    title = "The 2026 Q2 rebound remained below the benchmark",
+    subtitle = "Shading is a 95% prediction interval; dashed line marks credit expiration",
+    x = NULL,
+    y = "ZEV share"
+  ) +
+  report_theme
+```
+
+The benchmark expected a 22.5% share in 2026 Q2, 3.38 percentage points above
+the observed value, although the observation remained inside a wide 95%
+prediction interval of 17.7% to 27.3%. Diagnostics reinforce caution. The model
+has only 10 training quarters and five residual degrees of freedom. One
+observation exceeds the common Cook's-distance screening threshold. Moreover,
+the simpler seasonal-only model has lower leave-one-out RMSE, while the
+mean-only model has the best AICc. The benchmark is useful for visualization,
+not a credible causal counterfactual.
+
+Between 2025 Q4 and 2026 Q2, average California regular gasoline prices rose
+32.0%, from $4.34 to $5.73 per gallon, and Google Trends interest in “electric
+vehicle” rose 140%. Attention clearly increased, but a normalized search index
+cannot measure the number or purchase intent of searchers.
+
+## Geographic and behavioral response
+
+Forty-nine of 58 counties increased ZEV share, with a median increase of 2.35
+percentage points. The official statewide result includes an “Out of State”
+mailing-address category; excluding that category raises the aggregate change
+from 0.19 to 1.27 percentage points. The official measure remains primary, and
+the county-only calculation is a sensitivity check.
+
+```{r county-segments, fig.cap="County segment positions; point size represents average quarterly light-duty sales."}
+ggplot(
+  segments,
+  aes(
+    100 * zev_share_2025_q4,
+    change_percentage_points,
+    size = average_quarterly_ldv_sales,
+    color = segment
+  )
+) +
+  geom_hline(yintercept = 0, color = "#746e64", linetype = "dotted") +
+  geom_point(alpha = 0.8) +
+  scale_size_area(max_size = 13, labels = label_comma()) +
+  scale_color_manual(values = c(
+    "Large established EV markets" = teal,
+    "Low-adoption / stalled" = rust,
+    "Small-market / fast rebound" = gold
+  )) +
+  labs(
+    title = "County markets followed three broad response patterns",
+    x = "2025 Q4 ZEV share (%)",
+    y = "Change to 2026 Q2 (percentage points)",
+    size = "Average quarterly sales"
+  ) +
+  report_theme
+```
+
+The large established segment contains 27 counties, averages a 19.8% baseline
+share, and gains 2.03 percentage points. The low-adoption/stalled segment
+contains 16 counties and declines 0.36 points on average. Fifteen small-market
+counties form a fast-rebound segment averaging a 6.09-point increase, but their
+small sales denominators make large movements more likely.
+
+VMT does not show a large sustained driving reduction. March, April, and May
+2026 changed +3.5%, -0.8%, and -0.1% from the same months a year earlier. The
+three-month mean was +0.87%; May is preliminary and June was unavailable.
+
+```{r vmt-response, fig.cap="Monthly change from the same month one year earlier."}
+vmt_display <- vmt[vmt$observation_month >= as.Date("2024-01-01"), ]
+vmt_display$direction <- ifelse(
+  vmt_display$yoy_change >= 0, "More driving", "Less driving"
+)
+ggplot(vmt_display, aes(observation_month, yoy_change, fill = direction)) +
+  geom_hline(yintercept = 0, color = "#746e64") +
+  geom_col(width = 24) +
+  geom_vline(
+    xintercept = as.Date("2026-02-28"),
+    color = rust, linetype = "dashed"
+  ) +
+  scale_fill_manual(values = c("More driving" = teal, "Less driving" = rust)) +
+  scale_y_continuous(labels = label_percent(accuracy = 1)) +
+  scale_x_date(date_breaks = "3 months", date_labels = "%Y\n%b") +
+  labs(
+    title = "Early post-war driving evidence is mixed",
+    x = NULL,
+    y = "Year-over-year VMT change"
+  ) +
+  report_theme
+```
+
+## Managerial recommendations
+
+Managers should not make a statewide inventory bet based on one post-war
+quarter. In large established EV markets, maintain inventory availability and
+use fuel-cost messaging to convert renewed search interest. In low-adoption
+counties, diagnose charging access, affordability, and awareness before adding
+inventory. In small fast-rebound markets, use light-touch campaigns and avoid
+overreacting to volatile percentage changes. Continue monthly leading-indicator
+tracking and re-estimate the benchmark when more quarters become available.
+
+## Limitations and next analysis
+
+The study is observational and cannot separate the war, gasoline prices, tax
+policy, interest rates, manufacturer incentives, seasonality, and vehicle
+prices. County observations share the same statewide environment and are not
+independent replications of the shock. Google Trends is relative, VMT is
+incomplete for 2026 Q2, and the sales series has only one complete post-war
+quarter.
+
+**Conjoint analysis is intentionally pending.** When the class survey data are
+available, the project will estimate attribute utilities, relative importance,
+willingness to pay, and scenario choice shares. No conjoint findings are
+included in the current conclusions.
+
+## Sources
+
+- [California Energy Commission ZEV sales](https://www.energy.ca.gov/data-reports/energy-almanac/zero-emission-vehicle-and-infrastructure-statistics-collection/new-zev)
+- [U.S. Energy Information Administration gasoline prices](https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_sca_w.htm)
+- [Google Trends](https://trends.google.com/trends/)
+- [FHWA Traffic Volume Trends](https://www.fhwa.dot.gov/policyinformation/travel_monitoring/tvt.cfm)

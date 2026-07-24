@@ -28,6 +28,32 @@ Every series therefore equals 100 in the selected quarter. A value of 120 means
 the series is 20% above its comparison-quarter value; a value of 80 means it is
 20% below.
 
+## Analytical techniques
+
+### Pre-event regression benchmark
+
+The theory-specified benchmark fits ZEV share to a linear time index and
+calendar-quarter indicators using 2023 Q1 through 2025 Q2. Later observations
+are compared with its 95% prediction interval. Mean-only, time-only,
+seasonal-only, and time-plus-season models are also compared using AICc and
+leave-one-out RMSE.
+
+The pipeline reports conventional and HC1 robust coefficient uncertainty,
+Shapiro-Wilk residual normality, an approximate Durbin-Watson statistic, Cook's
+distance, and leave-one-out error. These diagnostics expose weaknesses; they
+cannot make a 10-quarter training sample causal.
+
+### County market segmentation
+
+K-means clustering uses three standardized features: 2025 Q4 ZEV share, the
+percentage-point change through 2026 Q2, and log average quarterly light-duty
+sales. Two through six clusters are compared using mean silhouette width. The
+three-cluster solution is selected for parsimony and managerial interpretation;
+its silhouette near 0.34 is effectively tied with the maximum candidate value.
+
+The resulting segments are descriptive archetypes. They should not be treated
+as sharply separated, permanent, or causal county categories.
+
 ## Principal limitations
 
 - The time series is short and includes few post-war observations.

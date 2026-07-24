@@ -53,11 +53,18 @@ This model is a descriptive benchmark only. It has five residual degrees of
 freedom and cannot isolate the war, tax policy, prices, interest rates, and
 manufacturer incentives.
 
-### 3. County heterogeneity
+### 3. County heterogeneity and market segmentation
 
 Compare county ZEV share in 2025 Q4 and 2026 Q2. Exclude the `Out Of State`
 category and flag small markets because percentage-point changes can be
 unstable when sales counts are low.
+
+Use standardized baseline ZEV share, percentage-point change, and log average
+quarterly light-duty sales in a k-means segmentation. Compare two through six
+clusters using mean silhouette width. Select three clusters because it provides
+a parsimonious and managerially interpretable solution with fit effectively
+tied with the best candidate. Treat the segments as descriptive market
+archetypes, not natural or permanent county types.
 
 Do not treat the 58 counties as 58 independent observations of the statewide
 shock. They share the same policy and gasoline-price environment.
@@ -67,6 +74,18 @@ vehicles registered in California with a mailing address in another state.
 Keep the published CEC statewide measure as the primary result, but report a
 sensitivity analysis restricted to the 58 California county mailing-address
 categories.
+
+### Regression validation and robustness
+
+Compare mean-only, time-only, seasonal-only, and time-plus-season benchmark
+models using AICc and leave-one-out RMSE. For the selected benchmark, report
+conventional and HC1 heteroskedasticity-robust standard errors, residual
+normality, an approximate Durbin-Watson statistic, Cook's distance, and
+leave-one-out error.
+
+These diagnostics are warnings rather than proof of model validity. With only
+10 pre-event quarters and five residual degrees of freedom, the benchmark
+cannot support strong hypothesis tests or causal attribution.
 
 ### 4. VMT behavior response
 

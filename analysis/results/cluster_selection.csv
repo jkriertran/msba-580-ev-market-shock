@@ -1,0 +1,6 @@
+"clusters","mean_silhouette_width","selected","selection_reason"
+2,0.339258556830773,FALSE,""
+3,0.342566039153191,TRUE,"Selected for parsimony and business interpretability; its silhouette is effectively tied with the maximum."
+4,0.311566377964547,FALSE,""
+5,0.342658181432351,FALSE,""
+6,0.30465652717216,FALSE,""

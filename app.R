@@ -7,6 +7,7 @@
 library(shiny)
 library(dplyr)
 library(ggplot2)
+library(plotly)
 library(readr)
 library(scales)
 library(tidyr)
@@ -221,7 +222,7 @@ ui <- fluidPage(
         div(class = "section-kicker", "01 / Market timeline"),
         h2(class = "panel-title", textOutput("timeline_title", inline = TRUE)),
         p(class = "panel-subtitle", textOutput("timeline_subtitle", inline = TRUE)),
-        plotOutput("market_plot", height = "430px", hover = hoverOpts("market_hover"))
+        plotlyOutput("market_plot", height = "430px")
       ),
       div(
         class = "two-up",
@@ -230,7 +231,7 @@ ui <- fluidPage(
           div(class = "section-kicker", "02 / Signals in context"),
           h2(class = "panel-title", "Three market signals, one baseline"),
           p(class = "panel-subtitle", textOutput("context_subtitle", inline = TRUE)),
-          plotOutput("context_plot", height = "350px")
+          plotlyOutput("context_plot", height = "350px")
         ),
         tags$section(
           class = "panel",
@@ -252,7 +253,7 @@ ui <- fluidPage(
         ),
         div(
           class = "behavior-grid",
-          plotOutput("vmt_plot", height = "410px"),
+          plotlyOutput("vmt_plot", height = "410px"),
           uiOutput("vmt_evidence")
         )
       ),
@@ -261,7 +262,7 @@ ui <- fluidPage(
         div(class = "section-kicker", "05 / County benchmark"),
         h2(class = "panel-title", paste("County EV share in", latest_label)),
         p(class = "panel-subtitle", "Top 12 counties plus your selected county; share controls for differences in market size."),
-        plotOutput("county_plot", height = "430px")
+        plotlyOutput("county_plot", height = "430px")
       ),
       div(
         class = "method",
@@ -339,7 +340,7 @@ server <- function(input, output, session) {
     )
   })
 
-  output$market_plot <- renderPlot({
+  output$market_plot <- renderPlotly({
     data <- selected_series()
     cfg <- selected_config()
     baseline_value <- data$value[data$quarter_label == input$baseline][1]
@@ -378,10 +379,11 @@ server <- function(input, output, session) {
         geom_text(data = event_data, aes(x = date, y = Inf, label = event), inherit.aes = FALSE,
                   angle = 90, vjust = 1.25, hjust = 1.05, size = 3, color = "#7f2e20")
     }
-    plot
-  }, res = 110)
+    ggplotly(plot, tooltip = c("x", "y")) |>
+      config(displayModeBar = FALSE)
+  })
 
-  output$context_plot <- renderPlot({
+  output$context_plot <- renderPlotly({
     base <- quarterly |>
       select(quarter_start, quarter_label, zev_share, ca_regular_gas_avg, trends_electric_vehicle) |>
       pivot_longer(c(zev_share, ca_regular_gas_avg, trends_electric_vehicle), names_to = "signal", values_to = "value") |>
@@ -400,7 +402,14 @@ server <- function(input, output, session) {
       summarise(value = first(quarter_start)) |>
       pull(value)
 
-    ggplot(base, aes(quarter_start, index, color = signal)) +
+    plot <- ggplot(base, aes(
+      quarter_start, index, color = signal,
+      text = paste0(
+        signal, "<br>", quarter_label,
+        "<br>Index: ", round(index, 1),
+        "<br>Raw value: ", round(value, 2)
+      )
+    )) +
       geom_hline(yintercept = 100, color = "#746e64", linetype = "dotted") +
       geom_vline(
         xintercept = baseline_date,
@@ -431,7 +440,10 @@ server <- function(input, output, session) {
         axis.title.y = element_text(margin = margin(r = 12)),
         plot.margin = margin(t = 8, r = 8, b = 8, l = 28)
       )
-  }, res = 110)
+
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
 
   output$context_subtitle <- renderText({
     paste0(
@@ -465,7 +477,7 @@ server <- function(input, output, session) {
     )
   })
 
-  output$vmt_plot <- renderPlot({
+  output$vmt_plot <- renderPlotly({
     display <- vmt_monthly |>
       filter(observation_month >= as.Date("2024-01-01"))
 
@@ -512,8 +524,9 @@ server <- function(input, output, session) {
           vjust = 1.25, hjust = 1.05, size = 3, color = "#7f2e20"
         )
     }
-    plot
-  }, res = 110)
+    ggplotly(plot, tooltip = c("x", "y", "fill")) |>
+      config(displayModeBar = FALSE)
+  })
 
   output$vmt_evidence <- renderUI({
     get_change <- function(month) {
@@ -545,7 +558,7 @@ server <- function(input, output, session) {
     )
   })
 
-  output$county_plot <- renderPlot({
+  output$county_plot <- renderPlotly({
     latest <- county_panel |>
       filter(quarter_start == latest_quarter, total_ldv_sales >= 100) |>
       arrange(desc(zev_share)) |>
@@ -559,7 +572,13 @@ server <- function(input, output, session) {
         highlight = if_else(as.character(county) %in% selected, "Selected county", "Other county")
       )
 
-    ggplot(displayed, aes(zev_share, county, fill = highlight)) +
+    plot <- ggplot(displayed, aes(
+      zev_share, county, fill = highlight,
+      text = paste0(
+        as.character(county), "<br>ZEV share: ",
+        percent(zev_share, accuracy = .1)
+      )
+    )) +
       geom_col(width = .68) +
       geom_text(aes(label = percent(zev_share, accuracy = .1)), hjust = -0.12, size = 3.4, color = "#27241f") +
       scale_fill_manual(values = c("Selected county" = "#b9472e", "Other county" = "#176b68"), guide = "none") +
@@ -567,7 +586,10 @@ server <- function(input, output, session) {
       labs(x = "ZEV share of new light-duty sales", y = NULL,
            caption = "Counties with fewer than 100 total light-duty sales in the quarter are excluded.") +
       theme_editorial()
-  }, res = 110)
+
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
 }
 
 shinyApp(ui, server)

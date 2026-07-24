@@ -43,6 +43,11 @@ The observation remained inside the model's wide 95% prediction interval
 (17.7% to 27.3%). The model has only five residual degrees of freedom and is a
 descriptive benchmark, not a causal counterfactual.
 
+Model comparison, robust standard errors, influence screening, residual
+diagnostics, and leave-one-out error are reported in the generated analysis
+tables. These checks make the uncertainty visible; they do not overcome the
+short pre-event history.
+
 ### County heterogeneity
 
 - 49 of 58 California counties had a higher ZEV share in 2026 Q2 than in
@@ -52,6 +57,25 @@ descriptive benchmark, not a causal counterfactual.
   increased and the median increase was 2.25 percentage points.
 - Small-county results are volatile because a handful of vehicle transactions
   can create a large percentage-point change.
+
+### County market segments
+
+A three-cluster k-means solution provides a second major analytical technique:
+
+- **Low-adoption / stalled:** 16 mostly smaller counties averaged a 9.7% 2025
+  Q4 ZEV share and a 0.36 percentage-point decline. This group calls for
+  investigation of affordability, charging, and awareness barriers before
+  adding inventory.
+- **Small-market / fast rebound:** 15 small-market counties averaged an 8.4%
+  baseline share and a 6.09 percentage-point increase. The direction is
+  encouraging, but small denominators make the magnitude volatile.
+- **Large established EV markets:** 27 counties averaged a 19.8% baseline share,
+  a 2.03 percentage-point increase, and much greater sales volume. This is the
+  strongest candidate for inventory and conversion-focused campaigns.
+
+The three-cluster mean silhouette width is only about 0.34, effectively tied
+with the best candidate solution. The segments are useful business summaries,
+not evidence of sharply separated or permanent county types.
 
 The official CEC statewide total includes vehicles registered in California
 with an out-of-state mailing address. The official statewide share increased
@@ -82,6 +106,24 @@ is preliminary and June 2026 is unavailable.
 > Driving behavior was mixed. These patterns are consistent with renewed EV
 > attention, but they do not establish that the war or gasoline prices caused
 > the rebound.
+
+## Managerial recommendations
+
+1. **Avoid a statewide inventory bet based on one quarter.** Treat the sharp
+   increase in search interest as a leading indicator and confirm it against
+   later registrations before committing broadly.
+2. **Prioritize large established EV markets.** Maintain inventory availability
+   and use fuel-cost messaging in the 27-county segment where adoption and
+   addressable sales volume are already high.
+3. **Diagnose barriers in stalled counties.** Investigate affordability,
+   charging access, and awareness before adding inventory in the low-adoption
+   segment.
+4. **Do not overreact to small-market growth rates.** The fast-rebound segment
+   has encouraging direction but volatile percentage changes because sales
+   denominators are small.
+5. **Update the evidence monthly and quarterly.** Add new VMT, gasoline-price,
+   search-interest, and CEC sales releases, then re-estimate the benchmark once
+   more post-war quarters exist.
 
 ## Required caveat
 

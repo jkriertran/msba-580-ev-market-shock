@@ -1,0 +1,4 @@
+"segment","counties","mean_baseline_share_percentage_points","mean_change_percentage_points","median_change_percentage_points","mean_average_quarterly_ldv_sales","counties_with_increase","recommended_action"
+"Large established EV markets",27,19.8478476353649,2.03004779345302,2.30531884604943,14300.3888888889,24,"Prioritize inventory availability and conversion campaigns where the addressable market is already large."
+"Low-adoption / stalled",16,9.66714745982584,-0.357530018853029,0.914114017713234,767.5625,10,"Investigate affordability and charging barriers before increasing inventory; target education and incentive communication."
+"Small-market / fast rebound",15,8.35388853657623,6.09249213241953,5.91577540106952,292.566666666667,15,"Use light-touch campaigns and avoid inventory overreaction because small sales denominators make growth rates volatile."
