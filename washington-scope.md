@@ -10,7 +10,7 @@ Make Washington monthly new light-duty title transactions the primary observed-m
 - [x] Build the Washington monthly pipeline and interrupted-time-series models → Verified rolling validation, robust uncertainty, and saved result tables.
 - [x] Refactor the Shiny app around Washington trends and regression evidence → Verified all inputs and the Shiny server with `testServer`.
 - [x] Rewrite the report, methodology, findings, README, and presentation → Verified consistent Washington-first language and an 816-word report.
-- [ ] Run project validation, render the report, push the branch, and update Posit Cloud → Verify GitHub checks and the live app.
+- [x] Run project validation, render the report, push the branch, and update Posit Cloud → Verified local and GitHub checks plus the live Posit app.
 
 ## Done When
 
