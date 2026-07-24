@@ -25,6 +25,13 @@ Required packages: `shiny`, `dplyr`, `ggplot2`, `readr`, `scales`, and `tidyr`.
 - `data/california_vmt_monthly.csv`: monthly California vehicle-miles traveled.
 - `data/data_dictionary.csv`: definitions for the fields used by the application.
 - `scripts/validate_project.R`: reproducibility and data-contract checks.
+- `scripts/run_descriptive_analysis.R`: event contrasts, seasonal benchmark,
+  county heterogeneity, and VMT summaries.
+- `analysis/analysis_plan.md`: research questions, hypotheses, methods, and
+  conjoint-analysis extension.
+- `analysis/preliminary_findings.md`: current effect sizes, interpretation, and
+  presentation-ready conclusion.
+- `analysis/results/`: reproducible analytical output tables.
 - `feedback/`: formal peer-feedback templates and received/given critique.
 - `presentation/`: presentation outline and demo sequence.
 - `docs/methodology.md`: analytical definitions, transformations, and limitations.

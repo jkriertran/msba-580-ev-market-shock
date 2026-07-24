@@ -1,0 +1,7 @@
+"contrast","metric","from_quarter","to_quarter","from_value","to_value","absolute_change","relative_change","display_unit","absolute_change_percentage_points"
+"Pull-forward to post-credit","zev_share","2025 Q3","2025 Q4",0.283272334981255,0.189005251872339,-0.0942670831089156,-0.33277899557383,"proportion",-9.42670831089156
+"Post-credit to war transition","zev_share","2025 Q4","2026 Q1",0.189005251872339,0.157624949727615,-0.031380302144724,-0.166028731127108,"proportion",-3.1380302144724
+"War transition to full post-war","zev_share","2026 Q1","2026 Q2",0.157624949727615,0.190878563988063,0.0332536142604474,0.210966692252157,"proportion",3.32536142604474
+"Post-credit/pre-war to full post-war","zev_share","2025 Q4","2026 Q2",0.189005251872339,0.190878563988063,0.00187331211572342,0.00991142890033925,"proportion",0.187331211572342
+"Post-credit/pre-war to full post-war","ca_regular_gas_avg","2025 Q4","2026 Q2",4.33984615384615,5.728,1.38815384615385,0.31986245524478,"dollars_per_gallon",
+"Post-credit/pre-war to full post-war","trends_electric_vehicle","2025 Q4","2026 Q2",20.7692307692308,49.8461538461538,29.0769230769231,1.4,"relative_index",

@@ -1,0 +1,3 @@
+"segment","counties","counties_with_increase","median_change_percentage_points","lower_quartile_change_percentage_points","upper_quartile_change_percentage_points","aggregate_2025_q4_share","aggregate_2026_q2_share","aggregate_change_percentage_points"
+"All California counties",58,49,2.35091022095868,0.906484836060218,4.54115256827682,0.19755019643458,0.210287059764103,1.2736863329523
+"Counties averaging at least 1,000 quarterly LDV sales",33,30,2.25457022385116,1.07172613012932,2.83533773998189,0.199232434408148,0.211610036475084,1.23776020669354
