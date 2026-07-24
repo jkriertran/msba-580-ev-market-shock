@@ -13,6 +13,7 @@ required_files <- c(
   "data/quarterly_controls.csv",
   "data/county_panel.csv",
   "data/california_vmt_monthly.csv",
+  "data/conjoint_survey.csv",
   "data/data_dictionary.csv",
   "analysis/results/cluster_selection.csv",
   "analysis/results/county_segment_profiles.csv",
@@ -20,6 +21,10 @@ required_files <- c(
   "analysis/results/regression_coefficients.csv",
   "analysis/results/regression_diagnostics.csv",
   "analysis/results/regression_model_comparison.csv",
+  "analysis/results/conjoint_data_audit.csv",
+  "analysis/results/conjoint_partworths.csv",
+  "analysis/results/conjoint_attribute_tests.csv",
+  "analysis/results/conjoint_pairwise_contrasts.csv",
   "report/final_report.Rmd"
 )
 
@@ -41,6 +46,9 @@ required_columns <- list(
   "data/california_vmt_monthly.csv" = c(
     "observation_month", "vmt_million_miles", "yoy_change",
     "estimate_status", "source_url"
+  ),
+  "data/conjoint_survey.csv" = c(
+    "SurveyID", "orderShown", "Brand", "MPG", "Price", "Rating"
   )
 )
 
@@ -83,6 +91,38 @@ if (
     cluster_selection$clusters[cluster_selection$selected] != 3L
 ) {
   stop("Exactly the three-cluster solution must be marked selected.")
+}
+
+conjoint <- read.csv(
+  file.path(project_root, "data/conjoint_survey.csv"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+if (nrow(conjoint) != 140L || length(unique(conjoint$SurveyID)) != 20L) {
+  stop("Conjoint snapshot must contain 140 profiles across 20 SurveyIDs.")
+}
+if (any(grepl("name", names(conjoint), ignore.case = TRUE))) {
+  stop("The sanitized conjoint snapshot must not contain a name column.")
+}
+valid_ratings <- is.na(conjoint$Rating) |
+  conjoint$Rating %in% 1:5
+if (!all(valid_ratings) || sum(!is.na(conjoint$Rating)) != 123L) {
+  stop("Conjoint ratings must contain 123 valid values from 1 through 5.")
+}
+
+partworths <- read.csv(
+  file.path(project_root, "analysis/results/conjoint_partworths.csv"),
+  stringsAsFactors = FALSE
+)
+if (
+  nrow(partworths) != 9L ||
+    any(abs(tapply(
+      partworths$utility,
+      partworths$attribute,
+      sum
+    )) > 1e-8)
+) {
+  stop("Conjoint part-worth utilities must contain nine effect-coded levels.")
 }
 
 message("Project validation passed.")

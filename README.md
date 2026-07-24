@@ -26,8 +26,13 @@ with standard R installations and is used by the analytical pipeline.
 
 ```r
 system("Rscript scripts/run_descriptive_analysis.R")
+system("Rscript scripts/run_conjoint_analysis.R")
 rmarkdown::render("report/final_report.Rmd")
 ```
+
+The committed conjoint snapshot is used by default. Set
+`CONJOINT_REFRESH=true` before running the conjoint script to refresh only the
+anonymous Survey tab from Google Sheets; the names tab is never downloaded.
 
 The rendered report is also available at
 [`report/final_report.html`](report/final_report.html).
@@ -38,17 +43,20 @@ The rendered report is also available at
 - `data/quarterly_controls.csv`: statewide quarterly ZEV outcomes and context signals.
 - `data/county_panel.csv`: quarterly county-level ZEV outcomes and context signals.
 - `data/california_vmt_monthly.csv`: monthly California vehicle-miles traveled.
+- `data/conjoint_survey.csv`: sanitized rating profiles without respondent
+  names.
 - `data/data_dictionary.csv`: definitions for the fields used by the application.
 - `scripts/validate_project.R`: reproducibility and data-contract checks.
 - `scripts/run_descriptive_analysis.R`: event contrasts, seasonal benchmark,
   county heterogeneity, and VMT summaries.
-- `analysis/analysis_plan.md`: research questions, hypotheses, methods, and
-  conjoint-analysis extension.
+- `scripts/run_conjoint_analysis.R`: survey audit, rating-based part-worth
+  model, clustered inference, and design diagnostics.
+- `analysis/analysis_plan.md`: research questions, hypotheses, and methods.
 - `analysis/preliminary_findings.md`: current effect sizes, interpretation, and
   presentation-ready conclusion.
 - `analysis/results/`: reproducible analytical output tables.
-- `report/final_report.Rmd`: reproducible 800–1,000-word capstone report with
-  regression, segmentation, recommendations, and a conjoint placeholder.
+- `report/final_report.Rmd`: reproducible capstone report with regression,
+  segmentation, conjoint analysis, and recommendations.
 - `report/final_report.html`: rendered report ready for review or RPubs upload.
 - `feedback/`: formal peer-feedback templates and received/given critique.
 - `presentation/`: mini-project and 12-minute capstone presentation outlines.
@@ -56,11 +64,12 @@ The rendered report is also available at
 
 ## Draft feature checklist
 
-- Four interactive inputs: geography, primary signal, comparison quarter, and event-marker toggle.
-- Six reactive output groups: KPI strip, market timeline, normalized context
-  chart, dynamic interpretation, driving-response evidence, and county
-  benchmark.
-- Four interactive Plotly charts with point-level hover details.
+- Five interactive inputs: geography, primary signal, comparison quarter,
+  event-marker toggle, and conjoint-attribute filter.
+- Seven reactive output groups: KPI strip, market timeline, normalized context
+  chart, dynamic interpretation, driving-response evidence, county benchmark,
+  and stated-preference evidence.
+- Five interactive Plotly charts with point-level hover details.
 - Cleaned, project-produced California EV and market-control data.
 - A clear analytical question and visible interpretation guardrail.
 
@@ -71,6 +80,8 @@ The rendered report is also available at
 - Federal Reserve/BLS via FRED: auto-loan rates, vehicle CPI, and unemployment.
 - Google Trends: California relative search interest.
 - FHWA Traffic Volume Trends: monthly California vehicle miles traveled on all estimated roads and streets, based on state-reported traffic counts.
+- Group conjoint survey: anonymous profile ratings for brand, fuel economy, and
+  price.
 
 ## Challenges and limitations
 
@@ -80,6 +91,9 @@ The rendered report is also available at
 - Manufacturer incentives and charging data are not exhaustive.
 - CarGurus blocks automated retrieval, so its price trend is not used in this draft.
 - The VMT series currently ends in May 2026. May is preliminary and June is unavailable, so the app uses monthly year-over-year changes instead of treating Q2 as a complete quarterly total.
+- The conjoint sample contains 18 rated respondents and 123 completed ratings.
+  Brand and fuel economy are confounded in the design, so only the price result
+  supports a relatively clean attribute conclusion.
 
 ## Working AI-assisted revision log
 

@@ -54,6 +54,20 @@ its silhouette near 0.34 is effectively tied with the maximum candidate value.
 The resulting segments are descriptive archetypes. They should not be treated
 as sharply separated, permanent, or causal county categories.
 
+### Rating-based conjoint analysis
+
+The survey outcome is a 1-to-5 profile rating rather than a forced choice.
+Ratings are transformed to `6 - rating`, so higher values indicate greater
+preference. The model uses effect coding for brand, fuel economy, and price,
+respondent fixed effects, and CR1 standard errors clustered by respondent.
+Utilities sum to zero within each attribute.
+
+Attribute-level Wald tests and pairwise contrasts use 17 cluster degrees of
+freedom. Relative-importance estimates are exploratory because the design
+pairs Tesla almost exclusively with 110 MPGe, creating substantial
+brand–fuel-economy confounding. The pipeline does not claim willingness to pay
+or simulated choice shares.
+
 ## Principal limitations
 
 - The time series is short and includes few post-war observations.
@@ -61,4 +75,7 @@ as sharply separated, permanent, or causal county categories.
   manufacturer incentives, and other events overlap in time.
 - Google Trends measures normalized relative interest rather than search volume.
 - May 2026 VMT is preliminary, and June 2026 was unavailable for this draft.
+- The conjoint analysis has 18 rated respondents, 123 completed ratings, and
+  17 missing ratings.
+- Brand and fuel economy are not independently balanced in the conjoint design.
 - Associations displayed by the app should not be described as causal effects.

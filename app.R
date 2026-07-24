@@ -35,6 +35,23 @@ vmt_monthly <- read_csv("data/california_vmt_monthly.csv", show_col_types = FALS
   ) |>
   arrange(observation_month)
 
+conjoint_partworths <- read_csv(
+  "analysis/results/conjoint_partworths.csv",
+  show_col_types = FALSE
+)
+conjoint_attribute_tests <- read_csv(
+  "analysis/results/conjoint_attribute_tests.csv",
+  show_col_types = FALSE
+)
+conjoint_audit <- read_csv(
+  "analysis/results/conjoint_data_audit.csv",
+  show_col_types = FALSE
+)
+conjoint_pairwise <- read_csv(
+  "analysis/results/conjoint_pairwise_contrasts.csv",
+  show_col_types = FALSE
+)
+
 latest_quarter <- max(quarterly$quarter_start, na.rm = TRUE)
 latest_label <- quarterly$quarter_label[quarterly$quarter_start == latest_quarter][1]
 
@@ -151,6 +168,7 @@ h1 { font-family: 'DM Serif Display', serif; font-size: clamp(42px, 5vw, 76px); 
 .caveat { margin-top: 15px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,.35); font-family: 'IBM Plex Sans'; font-size: 12px; line-height: 1.5; opacity: .82; }
 .method { border-left: 4px solid var(--rust); padding: 4px 0 4px 17px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .behavior-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(230px, .55fr); gap: 30px; align-items: stretch; }
+.conjoint-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(250px, .55fr); gap: 30px; align-items: stretch; }
 .evidence-card { background: #fffdf8; border: 1px solid var(--ink); padding: 22px; display: flex; flex-direction: column; justify-content: center; }
 .evidence-card h3 { font-family: 'DM Serif Display'; font-size: 22px; margin: 0 0 16px; }
 .evidence-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); align-items: baseline; }
@@ -159,7 +177,7 @@ h1 { font-family: 'DM Serif Display', serif; font-size: clamp(42px, 5vw, 76px); 
 .evidence-takeaway { margin: 18px 0 0; color: var(--ink); font-size: 13px; line-height: 1.55; }
 .partial-flag { display: inline-block; margin-top: 14px; padding: 7px 9px; background: #f0dfc7; color: #713322; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 920px) { .app-grid, .two-up { grid-template-columns: 1fr; } .controls { border-right: 0; border-bottom: 1px solid var(--line); padding: 24px 5vw; } .controls-inner { position: static; } .content { padding: 28px 5vw; } }
-@media (max-width: 920px) { .behavior-grid { grid-template-columns: 1fr; } }
+@media (max-width: 920px) { .behavior-grid, .conjoint-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .signal-strip { grid-template-columns: 1fr; } .signal + .signal { border-left: 0; border-top: 1px solid var(--ink); } }
 "
 
@@ -195,6 +213,17 @@ ui <- fluidPage(
           choices = setNames(quarterly$quarter_label, quarterly$quarter_label), selected = "2025 Q4"
         ),
         checkboxInput("show_events", "Show policy and war markers", value = TRUE),
+        selectInput(
+          "conjoint_attribute",
+          "Conjoint attribute",
+          choices = c(
+            "All attributes",
+            "Price",
+            "Fuel economy",
+            "Brand"
+          ),
+          selected = "All attributes"
+        ),
         p(class = "help-copy",
           "Tip: choose a county and ZEV share to compare local adoption with the statewide market. Gas prices and search interest are statewide context signals."
         ),
@@ -263,6 +292,23 @@ ui <- fluidPage(
         h2(class = "panel-title", paste("County EV share in", latest_label)),
         p(class = "panel-subtitle", "Top 12 counties plus your selected county; share controls for differences in market size."),
         plotlyOutput("county_plot", height = "430px")
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "06 / Stated preferences"),
+        h2(class = "panel-title", "What did survey respondents value?"),
+        p(
+          class = "panel-subtitle",
+          paste0(
+            "Rating-based conjoint utilities: positive values indicate greater ",
+            "preference within an attribute; intervals show respondent-clustered uncertainty."
+          )
+        ),
+        div(
+          class = "conjoint-grid",
+          plotlyOutput("conjoint_plot", height = "520px"),
+          uiOutput("conjoint_evidence")
+        )
       ),
       div(
         class = "method",
@@ -593,6 +639,136 @@ server <- function(input, output, session) {
 
     ggplotly(plot, tooltip = "text") |>
       config(displayModeBar = FALSE)
+  })
+
+  output$conjoint_plot <- renderPlotly({
+    display <- conjoint_partworths
+    if (input$conjoint_attribute != "All attributes") {
+      display <- display |>
+        filter(attribute == input$conjoint_attribute)
+    }
+    display <- display |>
+      mutate(
+        attribute = factor(
+          attribute,
+          levels = c("Brand", "Fuel economy", "Price")
+        ),
+        level = factor(level, levels = rev(unique(level))),
+        hover = paste0(
+          attribute, ": ", level,
+          "<br>Utility: ", number(utility, accuracy = 0.01),
+          "<br>95% interval: ",
+          number(confidence_low, accuracy = 0.01), " to ",
+          number(confidence_high, accuracy = 0.01)
+        )
+      )
+
+    plot <- ggplot(
+      display,
+      aes(utility, level, color = attribute, text = hover)
+    ) +
+      geom_vline(xintercept = 0, color = "#746e64", linetype = "dotted") +
+      geom_errorbar(
+        aes(xmin = confidence_low, xmax = confidence_high),
+        orientation = "y",
+        width = .16,
+        linewidth = .7
+      ) +
+      geom_point(size = 3) +
+      facet_grid(
+        rows = vars(attribute),
+        scales = "free_y",
+        space = "free_y"
+      ) +
+      scale_color_manual(values = c(
+        "Brand" = "#176b68",
+        "Fuel economy" = "#8b6b2f",
+        "Price" = "#b9472e"
+      )) +
+      labs(
+        x = "Part-worth utility (higher = preferred)",
+        y = NULL,
+        caption = paste(
+          "Utilities are zero-centered within each attribute.",
+          "Ratings are stated preferences, not purchases."
+        )
+      ) +
+      theme_editorial() +
+      theme(
+        legend.position = "none",
+        strip.text = element_text(
+          color = "#27241f",
+          face = "bold",
+          hjust = 0
+        ),
+        strip.background = element_blank(),
+        panel.spacing.y = grid::unit(1, "lines")
+      )
+
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
+
+  output$conjoint_evidence <- renderUI({
+    audit_value <- function(metric_name) {
+      conjoint_audit |>
+        filter(metric == metric_name) |>
+        pull(value)
+    }
+    price_test <- conjoint_attribute_tests |>
+      filter(attribute == "Price")
+    price_contrast <- conjoint_pairwise |>
+      filter(
+        attribute == "Price",
+        level_1 == "$30,000",
+        level_2 == "$120,000"
+      )
+
+    div(
+      class = "evidence-card",
+      h3("What the survey supports"),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Respondents with ratings"),
+        span(
+          class = "evidence-number",
+          number(
+            audit_value("survey_ids_with_at_least_one_rating"),
+            accuracy = 1
+          )
+        )
+      ),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Usable profile ratings"),
+        span(
+          class = "evidence-number",
+          number(audit_value("complete_ratings"), accuracy = 1)
+        )
+      ),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "$30K vs. $120K difference"),
+        span(
+          class = "evidence-number",
+          number(price_contrast$preference_difference, accuracy = .01)
+        )
+      ),
+      p(
+        class = "evidence-takeaway",
+        paste0(
+          "Price was the clearest attribute (cluster-robust p = ",
+          number(price_test$p_value, accuracy = .001),
+          "). Lower-priced profiles were preferred. Brand and fuel economy ",
+          "cannot be cleanly separated because Tesla was always paired with ",
+          "110 MPGe and never with 20 or 35 MPG."
+        )
+      ),
+      span(
+        class = "partial-flag",
+        "Small class sample · stated ratings · directional evidence"
+      )
+    )
   })
 }
 

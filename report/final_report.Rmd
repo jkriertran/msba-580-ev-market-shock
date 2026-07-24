@@ -16,6 +16,9 @@ project_root <- normalizePath(file.path(dirname(report_path), ".."), mustWork = 
 analysis_script <- file.path(project_root, "scripts", "run_descriptive_analysis.R")
 analysis_status <- system2(file.path(R.home("bin"), "Rscript"), analysis_script)
 if (analysis_status != 0L) stop("The analysis pipeline did not complete.")
+conjoint_script <- file.path(project_root, "scripts", "run_conjoint_analysis.R")
+conjoint_status <- system2(file.path(R.home("bin"), "Rscript"), conjoint_script)
+if (conjoint_status != 0L) stop("The conjoint pipeline did not complete.")
 
 knitr::opts_chunk$set(
   echo = FALSE,
@@ -47,6 +50,9 @@ segments <- read_result("county_segments.csv")
 segment_profiles <- read_result("county_segment_profiles.csv")
 model_comparison <- read_result("regression_model_comparison.csv")
 diagnostics <- read_result("regression_diagnostics.csv")
+conjoint_partworths <- read_result("conjoint_partworths.csv")
+conjoint_tests <- read_result("conjoint_attribute_tests.csv")
+conjoint_pairwise <- read_result("conjoint_pairwise_contrasts.csv")
 vmt <- read.csv(
   file.path(project_root, "data", "california_vmt_monthly.csv"),
   stringsAsFactors = FALSE
@@ -89,13 +95,11 @@ increased, and was the rebound large enough to offset the post-credit decline?**
 We also examine whether Californians reduced driving and whether counties
 followed distinct response patterns.
 
-The answer is cautious. California's official ZEV share recovered from its
-2026 Q1 low, but by 2026 Q2 it was only 0.19 percentage points above the
-immediate post-credit 2025 Q4 level. The rebound coincided with sharply higher
-gasoline prices and much greater EV search interest, yet the quarterly record
-cannot show that either caused purchases. Vehicle-miles traveled (VMT) provides
-mixed evidence of reduced driving. Managers should treat the period as renewed
-consumer attention, not proof of a permanent demand shift.
+California's ZEV share recovered from its 2026 Q1 low, but by Q2 it was only
+0.19 percentage points above the post-credit 2025 Q4 level. The rebound
+coincided with higher gasoline prices and EV search interest, but cannot prove
+causation. VMT provides mixed evidence of reduced driving. Managers should
+treat the period as renewed attention, not a permanent demand shift.
 
 ## Data and analytical approach
 
@@ -103,19 +107,15 @@ The project combines independently sourced public data. California Energy
 Commission records provide quarterly new light-duty ZEV and total light-duty
 sales statewide and by county. ZEVs include battery electric, plug-in hybrid,
 and hydrogen fuel-cell vehicles; they exclude used and medium- or heavy-duty
-vehicles. U.S. Energy Information Administration data supply California regular
-gasoline prices. Google Trends supplies a normalized relative search-interest
-index, not search counts. FHWA Traffic Volume Trends, based on state-reported
-counts, supplies monthly statewide VMT. Economic controls are retained in the
-project dataset for context.
+vehicles. EIA data supply gasoline prices; Google Trends supplies relative
+interest, not search counts; and FHWA Traffic Volume Trends supplies monthly
+statewide VMT.
 
-We use two major analytical techniques. First, a pre-event regression benchmark
+The observed-market analysis uses two major techniques. First, a pre-event regression benchmark
 fits a linear time trend and calendar-quarter indicators to 2023 Q1 through
 2025 Q2, then compares later observations with predictions. We compare that
-specification with mean-only, time-only, and seasonal-only alternatives using
-small-sample AICc and leave-one-out error. We also report HC1 robust standard
-errors, residual normality, an approximate Durbin-Watson statistic, Cook's
-distance, and leave-one-out RMSE.
+specification with simpler alternatives using small-sample AICc and
+leave-one-out error and report robust and influence diagnostics.
 
 Second, k-means segmentation groups the 58 California county mailing-address
 categories using standardized 2025 Q4 ZEV share, the change through 2026 Q2,
@@ -123,6 +123,11 @@ and log average quarterly light-duty sales. We inspect two through six clusters
 using mean silhouette width and select three for parsimony and business
 interpretability. The silhouette near 0.34 indicates only moderate separation,
 so these are descriptive archetypes rather than permanent county types.
+
+Third, a rating-based conjoint model analyzes 123 completed profile ratings
+from 18 respondents. Ratings are reversed so higher scores mean greater
+preference, then modeled with effect-coded attributes, respondent fixed
+effects, and respondent-clustered standard errors.
 
 ## What changed?
 
@@ -157,14 +162,11 @@ ggplot(benchmark, aes(quarter_start)) +
   report_theme
 ```
 
-The benchmark expected a 22.5% share in 2026 Q2, 3.38 percentage points above
-the observed value, although the observation remained inside a wide 95%
-prediction interval of 17.7% to 27.3%. Diagnostics reinforce caution. The model
-has only 10 training quarters and five residual degrees of freedom. One
-observation exceeds the common Cook's-distance screening threshold. Moreover,
-the simpler seasonal-only model has lower leave-one-out RMSE, while the
-mean-only model has the best AICc. The benchmark is useful for visualization,
-not a credible causal counterfactual.
+The benchmark expected 22.5% in 2026 Q2, 3.38 points above observed, although
+the observation remained inside its 17.7%–27.3% prediction interval. With only
+10 training quarters, one influential observation, and simpler models
+performing better on some criteria, this is a visualization—not a causal
+counterfactual.
 
 Between 2025 Q4 and 2026 Q2, average California regular gasoline prices rose
 32.0%, from $4.34 to $5.73 per gallon, and Google Trends interest in “electric
@@ -206,11 +208,9 @@ ggplot(
   report_theme
 ```
 
-The large established segment contains 27 counties, averages a 19.8% baseline
-share, and gains 2.03 percentage points. The low-adoption/stalled segment
-contains 16 counties and declines 0.36 points on average. Fifteen small-market
-counties form a fast-rebound segment averaging a 6.09-point increase, but their
-small sales denominators make large movements more likely.
+The 27 large established markets average a 2.03-point gain. The 16
+low-adoption/stalled counties decline 0.36 points. Fifteen small markets average
+a 6.09-point rebound, but small denominators magnify movements.
 
 VMT does not show a large sustained driving reduction. March, April, and May
 2026 changed +3.5%, -0.8%, and -0.1% from the same months a year earlier. The
@@ -239,6 +239,39 @@ ggplot(vmt_display, aes(observation_month, yoy_change, fill = direction)) +
   report_theme
 ```
 
+## Stated preferences
+
+The survey provides complementary stated-preference evidence. Price was the
+clearest attribute (cluster-robust p = 0.013): a $30,000 profile scored 1.30
+points above a $120,000 profile (p = 0.005). Tesla was paired almost exclusively
+with 110 MPGe, so brand and fuel economy cannot be cleanly separated.
+
+```{r conjoint-utilities, fig.cap="Rating-based conjoint part-worth utilities with respondent-clustered 95% intervals."}
+conjoint_partworths$level <- factor(
+  conjoint_partworths$level,
+  levels = rev(conjoint_partworths$level)
+)
+ggplot(conjoint_partworths, aes(utility, level, color = attribute)) +
+  geom_vline(xintercept = 0, color = "#746e64", linetype = "dotted") +
+  geom_errorbar(
+    aes(xmin = confidence_low, xmax = confidence_high),
+    width = 0.16,
+    orientation = "y"
+  ) +
+  geom_point(size = 2.7) +
+  facet_wrap(~attribute, scales = "free_y", ncol = 1) +
+  scale_color_manual(values = c(
+    "Brand" = teal, "Fuel economy" = gold, "Price" = rust
+  )) +
+  labs(
+    title = "Affordability produced the clearest preference signal",
+    subtitle = "Positive utilities indicate greater stated preference",
+    x = "Part-worth utility (preference-score points)",
+    y = NULL
+  ) +
+  report_theme
+```
+
 ## Managerial recommendations
 
 Managers should not make a statewide inventory bet based on one post-war
@@ -246,8 +279,10 @@ quarter. In large established EV markets, maintain inventory availability and
 use fuel-cost messaging to convert renewed search interest. In low-adoption
 counties, diagnose charging access, affordability, and awareness before adding
 inventory. In small fast-rebound markets, use light-touch campaigns and avoid
-overreacting to volatile percentage changes. Continue monthly leading-indicator
-tracking and re-estimate the benchmark when more quarters become available.
+overreacting to volatile percentage changes. The survey supports emphasizing
+affordability and total ownership cost, but not a brand-specific conclusion.
+Continue monthly leading-indicator tracking and re-estimate the benchmark when
+more quarters become available.
 
 ## Limitations and next analysis
 
@@ -256,12 +291,10 @@ policy, interest rates, manufacturer incentives, seasonality, and vehicle
 prices. County observations share the same statewide environment and are not
 independent replications of the shock. Google Trends is relative, VMT is
 incomplete for 2026 Q2, and the sales series has only one complete post-war
-quarter.
-
-**Conjoint analysis is intentionally pending.** When the class survey data are
-available, the project will estimate attribute utilities, relative importance,
-willingness to pay, and scenario choice shares. No conjoint findings are
-included in the current conclusions.
+quarter. The conjoint sample is small, uses ratings rather than forced choices,
+and has 17 missing ratings. Its brand–fuel-economy confounding prevents clean
+attribute separation, so we do not report willingness to pay or simulated
+choice shares.
 
 ## Sources
 

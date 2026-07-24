@@ -15,7 +15,7 @@ benchmarks, not a causal effect of the Iran war.
   and Google Trends.
 - County-quarter for geographic heterogeneity in ZEV share.
 - State-month for vehicle-miles traveled.
-- Respondent-choice task for the future conjoint analysis.
+- Respondent-profile rating for the conjoint analysis.
 
 ## Testable hypotheses
 
@@ -96,23 +96,22 @@ Summarize March through May 2026 and compare that window with March through May
 The current VMT evidence is incomplete: May 2026 is preliminary and June 2026
 is unavailable.
 
-## Future conjoint analysis
+## 5. Rating-based conjoint analysis
 
-Once the survey data are available, reshape each choice task to one row per
-alternative and estimate a conditional logit model. Candidate attributes
-include purchase price, fuel cost, driving range, charging time, powertrain,
-and tax-credit availability.
+The survey displays seven profiles per SurveyID and asks respondents to rate
+each profile from 1 (best) to 5 (worst); ties are permitted. Convert ratings to
+`6 - rating` so higher scores indicate stronger preference. Estimate an OLS
+part-worth model using effect coding for brand, fuel economy, and price,
+respondent fixed effects, and respondent-clustered CR1 standard errors.
 
-Report:
+Report attribute utilities with 95% intervals, cluster-robust joint tests, and
+pairwise level contrasts. Treat relative-importance estimates as exploratory.
+The design pairs Tesla almost exclusively with 110 MPGe, so brand and fuel
+economy are confounded and cannot be cleanly interpreted separately. Do not
+calculate willingness to pay or scenario choice shares from this design.
 
-- Attribute-level utilities and uncertainty.
-- Relative attribute importance.
-- Willingness-to-pay estimates when a continuous price attribute is available.
-- Predicted choice shares for policy and gasoline-price scenarios.
-- Respondent-segment results only when sample sizes are adequate.
-
-The conjoint analysis will address preferences and tradeoffs; the market data
-will address observed timing and behavior. They should not be pooled into a
+The conjoint analysis addresses stated preferences; the market data address
+observed timing and behavior. They are complementary and are not pooled into a
 single causal model.
 
 ## Decision rule

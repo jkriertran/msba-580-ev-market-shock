@@ -23,4 +23,10 @@ california_vmt_monthly.csv,yoy_change,Change from the same calendar month one ye
 california_vmt_monthly.csv,estimate_status,Whether the observation is preliminary or revised,category
 california_vmt_monthly.csv,release_month,FHWA report month supplying the observation,date
 california_vmt_monthly.csv,road_coverage,Road network included in the estimate,text
+conjoint_survey.csv,SurveyID,Anonymous respondent identifier,integer
+conjoint_survey.csv,orderShown,Profile display position within respondent,integer
+conjoint_survey.csv,Brand,Vehicle brand shown in the profile,category
+conjoint_survey.csv,MPG,Fuel-economy level shown in the profile,category
+conjoint_survey.csv,Price,Purchase-price level shown in the profile,dollars
+conjoint_survey.csv,Rating,Profile rating where 1 is best and 5 is worst,ordinal score
 california_vmt_monthly.csv,source_url,FHWA report URL used for the observation,URL

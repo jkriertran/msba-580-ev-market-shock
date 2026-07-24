@@ -17,9 +17,9 @@ one speaking section and one anticipated question to every group member.
   sales.
 - Introduce CEC sales, EIA gasoline prices, Google Trends, economic controls,
   and FHWA/state-reported VMT.
+- Introduce the anonymous conjoint survey: 18 rated respondents and 123 profile
+  ratings.
 - Explain the official statewide `Out Of State` mailing-address category.
-- Note that survey-based conjoint data are pending and excluded from current
-  results.
 
 ## 3. Live Shiny demonstration — 2:00
 
@@ -29,6 +29,8 @@ one speaking section and one anticipated question to every group member.
 3. Toggle policy and war markers.
 4. Compare statewide and county ZEV share.
 5. Show the year-over-year VMT response.
+6. Filter the conjoint utilities to Price and hover over the confidence
+   intervals.
 
 ## 4. Technique 1: event sequence and benchmark — 2:00
 
@@ -58,22 +60,33 @@ one speaking section and one anticipated question to every group member.
   driving.
 - Flag preliminary May data and unavailable June data.
 
-## 7. Recommendations — 1:15
+## 7. Technique 3: stated preferences — 1:00
+
+- Explain that this is a rating-based part-worth model with respondent fixed
+  effects and respondent-clustered uncertainty.
+- Price was the clearest attribute (p = 0.013); $30,000 scored 1.30 preference
+  points above $120,000 (p = 0.005).
+- State the design limitation plainly: Tesla and 110 MPGe are confounded, so
+  brand and fuel economy cannot be cleanly separated.
+
+## 8. Recommendations — 1:00
 
 - Maintain inventory and conversion campaigns in established high-volume
   markets.
 - Diagnose charging, affordability, and awareness barriers in stalled markets.
 - Use light-touch campaigns in fast-growing small markets and avoid reacting to
   volatile rates.
+- Lead with affordability and ownership cost; do not make a brand-specific
+  claim from this survey.
 - Continue monthly leading-indicator tracking before making a statewide bet.
 
-## 8. Limitations, next step, and close — 1:30
+## 9. Limitations, next step, and close — 1:15
 
 - Do not claim the war caused the rebound.
 - Name the overlapping tax, price, interest-rate, manufacturer-incentive, and
   seasonal effects.
-- Explain that the conjoint analysis will add preference tradeoffs,
-  willingness to pay, and scenario choice shares once survey data arrive.
+- Explain the conjoint sample-size, missing-rating, and attribute-confounding
+  limitations.
 - Close by restating the decision answer in one sentence.
 
 ## Q&A preparation — 3:00
@@ -85,5 +98,5 @@ Prepare concise responses to:
 3. Why is the regression not causal?
 4. Why choose three clusters when five has a marginally higher silhouette?
 5. Does rising search interest represent actual demand?
-6. How will conjoint results complement the observed market data?
-
+6. Why is this rating-based model not a conditional logit?
+7. Why did you avoid willingness-to-pay and simulated-choice claims?

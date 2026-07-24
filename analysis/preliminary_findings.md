@@ -97,6 +97,18 @@ year earlier were +3.5%, -0.8%, and -0.1%.
 This is mixed evidence, not a large or sustained reduction in driving. May 2026
 is preliminary and June 2026 is unavailable.
 
+### Stated preferences
+
+The rating-based conjoint analysis uses 123 completed profile ratings from 18
+respondents. Price is the clearest attribute block (respondent-clustered
+p = 0.013). A $30,000 profile scores 1.30 preference points above a $120,000
+profile (95% CI 0.46 to 2.14; p = 0.005).
+
+Fuel economy is directionally favorable but does not clear the 5% threshold
+(p = 0.060), and brand is not statistically clear (p = 0.229). More
+importantly, Tesla is almost always paired with 110 MPGe, so the brand and fuel
+economy coefficients cannot be interpreted as clean independent effects.
+
 ## Presentation wording
 
 > California's official ZEV share recovered from its first-quarter low and was
@@ -121,7 +133,10 @@ is preliminary and June 2026 is unavailable.
 4. **Do not overreact to small-market growth rates.** The fast-rebound segment
    has encouraging direction but volatile percentage changes because sales
    denominators are small.
-5. **Update the evidence monthly and quarterly.** Add new VMT, gasoline-price,
+5. **Lead with affordability, not a brand claim.** The survey provides its
+   clearest evidence on price; the design cannot cleanly separate brand from
+   fuel economy.
+6. **Update the evidence monthly and quarterly.** Add new VMT, gasoline-price,
    search-interest, and CEC sales releases, then re-estimate the benchmark once
    more post-war quarters exist.
 
