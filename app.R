@@ -532,7 +532,7 @@ server <- function(input, output, session) {
         span(class = "evidence-label", "Rolling forecast RMSE"),
         span(
           class = "evidence-number",
-          percent(selected_model$rolling_rmse, accuracy = .1)
+          number(100 * selected_model$rolling_rmse, accuracy = .1, suffix = " pp")
         )
       ),
       div(
