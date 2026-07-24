@@ -402,20 +402,24 @@ server <- function(input, output, session) {
       summarise(value = first(quarter_start)) |>
       pull(value)
 
-    plot <- ggplot(base, aes(
-      quarter_start, index, color = signal,
-      text = paste0(
-        signal, "<br>", quarter_label,
-        "<br>Index: ", round(index, 1),
-        "<br>Raw value: ", round(value, 2)
-      )
-    )) +
+    plot <- ggplot(
+      base,
+      aes(quarter_start, index, color = signal, group = signal)
+    ) +
       geom_hline(yintercept = 100, color = "#746e64", linetype = "dotted") +
       geom_vline(
         xintercept = baseline_date,
         color = "#b9472e", linetype = "longdash", linewidth = .55
       ) +
-      geom_line(linewidth = 1) + geom_point(size = 2) +
+      geom_line(linewidth = 1) +
+      geom_point(
+        aes(text = paste0(
+          signal, "<br>", quarter_label,
+          "<br>Index: ", round(index, 1),
+          "<br>Raw value: ", round(value, 2)
+        )),
+        size = 2
+      ) +
       geom_point(
         data = base |> filter(quarter_label == input$baseline),
         shape = 21, size = 3.1, stroke = .8, fill = "#f6f1e7"
