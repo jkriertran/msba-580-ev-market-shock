@@ -1,0 +1,9 @@
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+.r_libs/
+rsconnect/
+.DS_Store
+.env
+*.log
