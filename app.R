@@ -42,6 +42,23 @@ wa_audit <- read_csv(
   "analysis/results/washington_data_audit.csv",
   show_col_types = FALSE
 )
+wa_gas_model_comparison <- read_csv(
+  "analysis/results/washington_gas_model_comparison.csv",
+  show_col_types = FALSE
+)
+wa_gas_coefficients <- read_csv(
+  "analysis/results/washington_gas_model_coefficients.csv",
+  show_col_types = FALSE
+)
+wa_gas_sensitivity <- read_csv(
+  "analysis/results/washington_gas_model_sensitivity.csv",
+  show_col_types = FALSE
+)
+wa_vmt <- read_csv(
+  "data/washington_vmt_monthly.csv",
+  show_col_types = FALSE
+) |>
+  mutate(month = as.Date(month))
 california_quarterly <- read_csv(
   "data/quarterly_controls.csv",
   show_col_types = FALSE
@@ -78,14 +95,21 @@ audit_value <- function(metric_name) {
 
 event_markers <- tibble::tribble(
   ~date, ~event,
+  as.Date("2025-07-31"), "WA sales-tax exemption ends",
   as.Date("2025-09-30"), "Federal credit ends",
   as.Date("2026-02-28"), "Iran war begins"
 )
 
 postwar <- wa_event_summary |> filter(period == "Post-war")
-prewar <- wa_event_summary |> filter(period == "Post-credit / pre-war")
+prewar <- wa_event_summary |>
+  filter(period == "Post-incentive-rolloff / pre-war")
 war_coefficient <- wa_its |> filter(term == "post_war")
-credit_coefficient <- wa_its |> filter(term == "post_credit")
+rolloff_coefficient <- wa_its |>
+  filter(term == "post_combined_incentive_rolloff")
+gas_coefficient <- wa_gas_coefficients |>
+  filter(term == "gas_price_prior_3m")
+gas_electricity_sensitivity <- wa_gas_sensitivity |>
+  filter(model == "plus_electricity")
 
 metric_config <- list(
   zev_share = list(
@@ -215,7 +239,7 @@ ui <- fluidPage(
   tags$header(
     class = "masthead",
     div(class = "eyebrow", "Washington EV Title Response Monitor"),
-    h1("Did higher fuel costs revive ZEV demand after the credit expired?"),
+    h1("Did higher fuel costs revive ZEV demand after incentives rolled off?"),
     p(
       class = "dek",
       paste0(
@@ -295,6 +319,14 @@ ui <- fluidPage(
               "Original titles are registration transactions, not dealer sale",
               "dates. The filter separately requires the DOL new-vehicle flag."
             )
+          ),
+          p(
+            strong("Policy label: "),
+            paste(
+              "post-incentive-rolloff combines Washington's July 2025",
+              "sales-tax-exemption expiration with the September 2025",
+              "federal-credit expiration; the data cannot cleanly separate them."
+            )
           )
         )
       )
@@ -313,7 +345,7 @@ ui <- fluidPage(
       tags$section(
         class = "panel",
         div(class = "section-kicker", "02 / Regression benchmark"),
-        h2(class = "panel-title", "Observed share versus pre-credit expectation"),
+        h2(class = "panel-title", "Observed share versus pre-rolloff expectation"),
         p(
           class = "panel-subtitle",
           paste(
@@ -330,12 +362,44 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "03 / County response"),
+        div(class = "section-kicker", "03 / Gas-price association"),
+        h2(class = "panel-title", "Did gasoline prices add predictive signal?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "The predictor is Washington's average regular gasoline price",
+            "during the three months before each title month. Policy timing,",
+            "trend, seasonality, and COVID are controlled."
+          )
+        ),
+        div(
+          class = "two-up",
+          plotlyOutput("gas_sensitivity_plot", height = "390px"),
+          uiOutput("gas_evidence")
+        )
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "04 / Behavioral response"),
+        h2(class = "panel-title", "Did Washingtonians drive less?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "Monthly Washington vehicle miles traveled compared with the",
+            "same month one year earlier. VMT is a separate outcome, not a",
+            "control in the ZEV-title regression."
+          )
+        ),
+        plotlyOutput("vmt_plot", height = "410px")
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "05 / County response"),
         h2(class = "panel-title", "Where did ZEV title share change?"),
         p(
           class = "panel-subtitle",
           paste(
-            "Post-war March–June 2026 versus post-credit/pre-war",
+            "Post-war March–June 2026 versus post-rolloff/pre-war",
             "November 2025–February 2026; largest county markets shown."
           )
         ),
@@ -343,7 +407,7 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "04 / California comparison"),
+        div(class = "section-kicker", "06 / California comparison"),
         h2(class = "panel-title", "Did the neighboring market move similarly?"),
         p(
           class = "panel-subtitle",
@@ -357,7 +421,7 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "05 / Stated preferences"),
+        div(class = "section-kicker", "07 / Stated preferences"),
         h2(class = "panel-title", "What did survey respondents value?"),
         p(
           class = "panel-subtitle",
@@ -492,7 +556,7 @@ server <- function(input, output, session) {
         alpha = .12
       ) +
       geom_line(
-        aes(y = expected_zev_share, color = "Pre-credit expectation"),
+        aes(y = expected_zev_share, color = "Pre-rolloff expectation"),
         linewidth = .9
       ) +
       geom_line(
@@ -511,7 +575,7 @@ server <- function(input, output, session) {
       ) +
       scale_color_manual(values = c(
         "Observed ZEV title share" = teal,
-        "Pre-credit expectation" = gold
+        "Pre-rolloff expectation" = gold
       )) +
       scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
       scale_y_continuous(labels = label_percent(accuracy = 1)) +
@@ -520,7 +584,7 @@ server <- function(input, output, session) {
         y = "ZEV share",
         caption = paste(
           "Shading uses ±1.96 rolling-validation RMSE.",
-          "Dashed = post-credit title period; dotted = post-war period."
+          "Dashed = post-incentive-rolloff period; dotted = post-war period."
         )
       ) +
       theme_editorial()
@@ -564,8 +628,8 @@ server <- function(input, output, session) {
       p(
         class = "evidence-takeaway",
         paste0(
-          "The post-credit level shift was ",
-          number(100 * credit_coefficient$estimate, accuracy = .1),
+          "The combined post-incentive-rolloff level shift was ",
+          number(100 * rolloff_coefficient$estimate, accuracy = .1),
           " percentage points (Newey–West p < 0.001). ",
           "The additional post-war change was not statistically distinct ",
           "(p = ", number(war_coefficient$p_value, accuracy = .001), ")."
@@ -588,7 +652,7 @@ server <- function(input, output, session) {
           class = "explainer-question",
           paste(
             "Did Washington's statewide ZEV title share depart from the",
-            "path its pre-credit history would predict?"
+            "path its pre-incentive-rolloff history would predict?"
           )
         )
       ),
@@ -635,7 +699,8 @@ server <- function(input, output, session) {
                 100 * empirical_half_width,
                 accuracy = .1
               ), " percentage points—not a causal confidence interval. ",
-              "Dashed marks the post-credit title period; dotted marks post-war."
+              "Dashed marks the post-incentive-rolloff title period; ",
+              "dotted marks post-war."
             )
           )
         ),
@@ -669,12 +734,182 @@ server <- function(input, output, session) {
         class = "benchmark-guardrail",
         strong("Important distinction: "),
         paste(
-          "gasoline price is context, not a predictor in this regression.",
-          "The panel does not estimate the effect of a $1 gas-price increase",
-          "and does not prove that the credit expiration or war caused the change."
+          "gasoline price is not a predictor in this benchmark; it is modeled",
+          "separately in Section 03. The benchmark does not prove that the",
+          "state or federal incentive expirations, or the war, caused the change."
         )
       )
     )
+  })
+
+  output$gas_sensitivity_plot <- renderPlotly({
+    display <- wa_gas_sensitivity |>
+      mutate(
+        specification = recode(
+          model,
+          policy_adjusted = "Policy-adjusted",
+          plus_unemployment = "+ WA unemployment",
+          plus_electricity = "+ WA electricity price",
+          plus_postwar_indicator = "+ Post-war indicator"
+        ),
+        specification = factor(
+          specification,
+          levels = rev(c(
+            "Policy-adjusted",
+            "+ WA unemployment",
+            "+ WA electricity price",
+            "+ Post-war indicator"
+          ))
+        ),
+        estimate_pp = 100 * gas_estimate,
+        low_pp = 100 * gas_confidence_low,
+        high_pp = 100 * gas_confidence_high,
+        tooltip = paste0(
+          specification,
+          "<br>Estimate: ",
+          number(estimate_pp, accuracy = .1),
+          " pp per $1",
+          "<br>95% CI: ",
+          number(low_pp, accuracy = .1),
+          " to ",
+          number(high_pp, accuracy = .1),
+          " pp"
+        )
+      )
+    plot <- ggplot(
+      display,
+      aes(estimate_pp, specification, text = tooltip)
+    ) +
+      geom_vline(xintercept = 0, color = muted, linetype = "dotted") +
+      geom_errorbar(
+        aes(xmin = low_pp, xmax = high_pp),
+        orientation = "y",
+        width = .16,
+        color = gold,
+        linewidth = .8
+      ) +
+      geom_point(color = teal, size = 3.2) +
+      labs(
+        x = "ZEV-share association per $1/gallon (percentage points)",
+        y = NULL,
+        caption = paste(
+          "Newey–West 95% intervals.",
+          "Association estimates are not causal effects."
+        )
+      ) +
+      theme_editorial()
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
+
+  output$gas_evidence <- renderUI({
+    no_gas <- wa_gas_model_comparison |> filter(model == "no_gas")
+    prior_three <- wa_gas_model_comparison |>
+      filter(model == "prior_three_month_average_gas")
+    rmse_improvement <- 1 - prior_three$rolling_rmse / no_gas$rolling_rmse
+    div(
+      class = "evidence-card",
+      h3("What the gas model supports"),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Rolling RMSE improvement"),
+        span(
+          class = "evidence-number",
+          percent(rmse_improvement, accuracy = .1)
+        )
+      ),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "Policy-adjusted association"),
+        span(
+          class = "evidence-number",
+          number(
+            100 * gas_coefficient$estimate,
+            accuracy = .1,
+            suffix = " pp / $1"
+          )
+        )
+      ),
+      div(
+        class = "evidence-row",
+        span(class = "evidence-label", "95% interval"),
+        span(
+          class = "evidence-number",
+          paste0(
+            number(100 * gas_coefficient$confidence_low, accuracy = .1),
+            " to ",
+            number(100 * gas_coefficient$confidence_high, accuracy = .1),
+            " pp"
+          )
+        )
+      ),
+      p(
+        class = "evidence-takeaway",
+        paste0(
+          "The prior-three-month gas measure modestly improved historical ",
+          "prediction. After adding Washington electricity prices, the estimate ",
+          "fell to ", number(
+            100 * gas_electricity_sensitivity$gas_estimate,
+            accuracy = .1
+          ), " pp per $1 and its interval included zero (p = ", number(
+            gas_electricity_sensitivity$gas_p_value,
+            accuracy = .001
+          ), ")."
+        )
+      ),
+      span(
+        class = "flag",
+        "Predictive association · sensitive to specification"
+      )
+    )
+  })
+
+  output$vmt_plot <- renderPlotly({
+    display <- wa_vmt |>
+      filter(month >= as.Date(input$window_start)) |>
+      mutate(
+        direction = if_else(
+          yoy_change < 0,
+          "Less driving",
+          "More driving"
+        ),
+        tooltip = paste0(
+          format(month, "%B %Y"),
+          "<br>Year-over-year: ",
+          percent(yoy_change, accuracy = .1),
+          "<br>VMT: ",
+          comma(vmt_million_miles),
+          " million miles"
+        )
+      )
+    plot <- ggplot(
+      display,
+      aes(month, yoy_change, fill = direction, text = tooltip)
+    ) +
+      geom_hline(yintercept = 0, color = muted) +
+      geom_col(width = 24) +
+      geom_vline(
+        xintercept = as.Date("2026-03-01"),
+        color = rust,
+        linetype = "longdash"
+      ) +
+      scale_fill_manual(values = c(
+        "Less driving" = rust,
+        "More driving" = teal
+      )) +
+      scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
+      scale_y_continuous(labels = label_percent(accuracy = 1)) +
+      labs(
+        x = NULL,
+        y = "Change from same month one year earlier",
+        caption = paste(
+          "FHWA Traffic Volume Trends.",
+          "May 2026 is preliminary; dashed line marks March 2026."
+        )
+      ) +
+      theme_editorial()
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
   })
 
   output$county_plot <- renderPlotly({

@@ -21,6 +21,18 @@ dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 pull_script <- file.path(project_root, "scripts", "pull_washington_data.R")
 pull_status <- system2(file.path(R.home("bin"), "Rscript"), pull_script)
 if (pull_status != 0L) stop("Washington data preparation did not complete.")
+controls_pull_script <- file.path(
+  project_root,
+  "scripts",
+  "pull_washington_controls.R"
+)
+controls_pull_status <- system2(
+  file.path(R.home("bin"), "Rscript"),
+  controls_pull_script
+)
+if (controls_pull_status != 0L) {
+  stop("Washington control-data preparation did not complete.")
+}
 
 required_packages <- c("dplyr", "readr", "tidyr")
 missing_packages <- required_packages[
@@ -46,6 +58,31 @@ county <- readr::read_csv(
   show_col_types = FALSE
 ) |>
   dplyr::mutate(month = as.Date(month))
+unemployment <- readr::read_csv(
+  file.path(project_root, "data", "washington_unemployment_monthly.csv"),
+  show_col_types = FALSE
+) |>
+  dplyr::mutate(month = as.Date(month)) |>
+  dplyr::arrange(month) |>
+  dplyr::mutate(
+    unemployment_interpolated = is.na(washington_unemployment_rate),
+    washington_unemployment_rate_model = stats::approx(
+      x = dplyr::row_number(),
+      y = washington_unemployment_rate,
+      xout = dplyr::row_number(),
+      rule = 2
+    )$y
+  )
+electricity <- readr::read_csv(
+  file.path(project_root, "data", "washington_electricity_monthly.csv"),
+  show_col_types = FALSE
+) |>
+  dplyr::mutate(month = as.Date(month))
+policy <- readr::read_csv(
+  file.path(project_root, "data", "washington_policy_monthly.csv"),
+  show_col_types = FALSE
+) |>
+  dplyr::mutate(month = as.Date(month))
 
 expected_months <- seq(min(titles$month), max(titles$month), by = "month")
 if (
@@ -66,19 +103,73 @@ analysis_data <- titles |>
     dplyr::select(gas, month, washington_regular_gas_price),
     by = "month"
   ) |>
+  dplyr::left_join(
+    dplyr::select(
+      unemployment,
+      month,
+      washington_unemployment_rate,
+      washington_unemployment_rate_model,
+      unemployment_interpolated
+    ),
+    by = "month"
+  ) |>
+  dplyr::left_join(
+    dplyr::select(
+      electricity,
+      month,
+      washington_residential_electricity_cents_kwh
+    ),
+    by = "month"
+  ) |>
+  dplyr::left_join(
+    dplyr::select(
+      policy,
+      month,
+      wa_sales_tax_exemption_active,
+      wa_instant_rebate_active,
+      federal_point_of_sale_credit_period,
+      combined_incentive_transition,
+      post_combined_incentive_rolloff
+    ),
+    by = "month"
+  ) |>
   dplyr::mutate(
     time_index = dplyr::row_number(),
+    time_centered = time_index - mean(time_index),
     calendar_month = factor(format(month, "%m")),
     covid_disruption = as.integer(
       month >= as.Date("2020-03-01") &
         month <= as.Date("2021-06-01")
     ),
-    post_credit = as.integer(month >= as.Date("2025-11-01")),
     post_war = as.integer(month >= as.Date("2026-03-01")),
+    gas_price_current = washington_regular_gas_price,
+    gas_price_lag_1m = dplyr::lag(washington_regular_gas_price, 1),
+    gas_price_lag_2m = dplyr::lag(washington_regular_gas_price, 2),
+    gas_price_prior_3m = (
+      dplyr::lag(washington_regular_gas_price, 1) +
+        dplyr::lag(washington_regular_gas_price, 2) +
+        dplyr::lag(washington_regular_gas_price, 3)
+    ) / 3,
+    electricity_price_prior_3m = (
+      dplyr::lag(
+        washington_residential_electricity_cents_kwh,
+        1
+      ) +
+        dplyr::lag(
+          washington_residential_electricity_cents_kwh,
+          2
+        ) +
+        dplyr::lag(
+          washington_residential_electricity_cents_kwh,
+          3
+        )
+    ) / 3,
     event_period = dplyr::case_when(
       month >= as.Date("2026-03-01") ~ "Post-war",
-      month >= as.Date("2025-11-01") ~ "Post-credit / pre-war",
-      month >= as.Date("2025-07-01") ~ "Credit pull-forward / processing",
+      post_combined_incentive_rolloff == 1 ~
+        "Post-incentive-rolloff / pre-war",
+      combined_incentive_transition == 1 ~
+        "Incentive transition / title processing",
       TRUE ~ "Pre-event"
     )
   )
@@ -188,9 +279,235 @@ newey_west_vcov <- function(model, lag = 4L) {
   finite_sample * bread %*% meat %*% bread
 }
 
+gas_candidate_formulas <- list(
+  no_gas = (
+    zev_share ~ time_index + I(time_index^2) +
+      calendar_month + covid_disruption
+  ),
+  current_month_gas = (
+    zev_share ~ time_index + I(time_index^2) +
+      calendar_month + covid_disruption + gas_price_current
+  ),
+  one_month_lag_gas = (
+    zev_share ~ time_index + I(time_index^2) +
+      calendar_month + covid_disruption + gas_price_lag_1m
+  ),
+  two_month_lag_gas = (
+    zev_share ~ time_index + I(time_index^2) +
+      calendar_month + covid_disruption + gas_price_lag_2m
+  ),
+  prior_three_month_average_gas = (
+    zev_share ~ time_index + I(time_index^2) +
+      calendar_month + covid_disruption + gas_price_prior_3m
+  )
+)
+
+gas_rolling_rows <- list()
+for (model_name in names(gas_candidate_formulas)) {
+  errors <- numeric()
+  for (test_index in seq(rolling_start, rolling_end)) {
+    rolling_training <- analysis_data[seq_len(test_index - 1L), ]
+    rolling_model <- lm(
+      gas_candidate_formulas[[model_name]],
+      data = rolling_training
+    )
+    rolling_prediction <- predict(
+      rolling_model,
+      newdata = analysis_data[test_index, , drop = FALSE]
+    )
+    errors <- c(
+      errors,
+      analysis_data$zev_share[test_index] - rolling_prediction
+    )
+  }
+  gas_rolling_rows[[model_name]] <- data.frame(
+    model = model_name,
+    rolling_months = length(errors),
+    rolling_rmse = sqrt(mean(errors^2)),
+    rolling_mae = mean(abs(errors)),
+    stringsAsFactors = FALSE
+  )
+}
+
+gas_model_comparison <- dplyr::bind_rows(gas_rolling_rows)
+no_gas_rmse <- gas_model_comparison$rolling_rmse[
+  gas_model_comparison$model == "no_gas"
+]
+best_gas_rmse <- min(
+  gas_model_comparison$rolling_rmse[
+    gas_model_comparison$model != "no_gas"
+  ]
+)
+gas_model_comparison <- gas_model_comparison |>
+  dplyr::mutate(
+    rmse_change_vs_no_gas = rolling_rmse / no_gas_rmse - 1,
+    selected_gas_candidate = (
+      model != "no_gas" &
+        rolling_rmse == best_gas_rmse
+    )
+  )
+readr::write_csv(
+  gas_model_comparison,
+  file.path(output_dir, "washington_gas_model_comparison.csv")
+)
+
+gas_association_model <- lm(
+  zev_share ~ time_centered + I(time_centered^2) +
+    calendar_month + covid_disruption +
+    wa_sales_tax_exemption_active + wa_instant_rebate_active +
+    combined_incentive_transition +
+    post_combined_incentive_rolloff + gas_price_prior_3m,
+  data = analysis_data
+)
+gas_association_vcov <- newey_west_vcov(
+  gas_association_model,
+  lag = 4L
+)
+gas_association_estimates <- coef(gas_association_model)
+gas_association_standard_errors <- sqrt(diag(gas_association_vcov))
+gas_association_degrees_freedom <- df.residual(gas_association_model)
+gas_association_critical <- qt(
+  0.975,
+  df = gas_association_degrees_freedom
+)
+gas_association_coefficients <- data.frame(
+  term = names(gas_association_estimates),
+  estimate = as.numeric(gas_association_estimates),
+  newey_west_standard_error = gas_association_standard_errors,
+  t_value = gas_association_estimates /
+    gas_association_standard_errors,
+  p_value = 2 * pt(
+    abs(
+      gas_association_estimates /
+        gas_association_standard_errors
+    ),
+    df = gas_association_degrees_freedom,
+    lower.tail = FALSE
+  ),
+  confidence_low = gas_association_estimates -
+    gas_association_critical * gas_association_standard_errors,
+  confidence_high = gas_association_estimates +
+    gas_association_critical * gas_association_standard_errors,
+  stringsAsFactors = FALSE
+)
+readr::write_csv(
+  gas_association_coefficients,
+  file.path(output_dir, "washington_gas_model_coefficients.csv")
+)
+
+gas_sensitivity_formulas <- list(
+  policy_adjusted = formula(gas_association_model),
+  plus_unemployment = update(
+    formula(gas_association_model),
+    . ~ . + washington_unemployment_rate_model
+  ),
+  plus_electricity = update(
+    formula(gas_association_model),
+    . ~ . + electricity_price_prior_3m
+  ),
+  plus_postwar_indicator = update(
+    formula(gas_association_model),
+    . ~ . + post_war
+  )
+)
+gas_sensitivity_rows <- lapply(
+  names(gas_sensitivity_formulas),
+  function(model_name) {
+    sensitivity_model <- lm(
+      gas_sensitivity_formulas[[model_name]],
+      data = analysis_data
+    )
+    sensitivity_vcov <- newey_west_vcov(sensitivity_model, lag = 4L)
+    sensitivity_standard_error <- sqrt(
+      diag(sensitivity_vcov)
+    )[["gas_price_prior_3m"]]
+    sensitivity_estimate <- coef(
+      sensitivity_model
+    )[["gas_price_prior_3m"]]
+    sensitivity_degrees_freedom <- df.residual(sensitivity_model)
+    sensitivity_critical <- qt(
+      0.975,
+      df = sensitivity_degrees_freedom
+    )
+    data.frame(
+      model = model_name,
+      observations = nobs(sensitivity_model),
+      gas_estimate = sensitivity_estimate,
+      gas_newey_west_standard_error = sensitivity_standard_error,
+      gas_p_value = 2 * pt(
+        abs(sensitivity_estimate / sensitivity_standard_error),
+        df = sensitivity_degrees_freedom,
+        lower.tail = FALSE
+      ),
+      gas_confidence_low = sensitivity_estimate -
+        sensitivity_critical * sensitivity_standard_error,
+      gas_confidence_high = sensitivity_estimate +
+        sensitivity_critical * sensitivity_standard_error,
+      adjusted_r_squared = summary(sensitivity_model)$adj.r.squared,
+      stringsAsFactors = FALSE
+    )
+  }
+)
+gas_sensitivity <- dplyr::bind_rows(gas_sensitivity_rows)
+readr::write_csv(
+  gas_sensitivity,
+  file.path(output_dir, "washington_gas_model_sensitivity.csv")
+)
+
+gas_term <- dplyr::filter(
+  gas_association_coefficients,
+  term == "gas_price_prior_3m"
+)
+gas_diagnostics <- data.frame(
+  metric = c(
+    "outcome",
+    "gas_exposure",
+    "training_window",
+    "rolling_validation_months",
+    "no_gas_rolling_rmse",
+    "prior_3m_gas_rolling_rmse",
+    "rolling_rmse_improvement",
+    "gas_coefficient_share_per_dollar",
+    "gas_coefficient_percentage_points_per_dollar",
+    "gas_newey_west_p_value",
+    "gas_confidence_low_percentage_points",
+    "gas_confidence_high_percentage_points",
+    "association_model_observations",
+    "unemployment_interpolated_months"
+  ),
+  value = c(
+    "Monthly new light-duty ZEV original-title share",
+    "Average Washington regular gasoline price in prior three months",
+    "2017-01 through 2025-06 for rolling comparison",
+    rolling_end - rolling_start + 1L,
+    no_gas_rmse,
+    gas_model_comparison$rolling_rmse[
+      gas_model_comparison$model ==
+        "prior_three_month_average_gas"
+    ],
+    1 - gas_model_comparison$rolling_rmse[
+      gas_model_comparison$model ==
+        "prior_three_month_average_gas"
+    ] / no_gas_rmse,
+    gas_term$estimate,
+    100 * gas_term$estimate,
+    gas_term$p_value,
+    100 * gas_term$confidence_low,
+    100 * gas_term$confidence_high,
+    nobs(gas_association_model),
+    sum(analysis_data$unemployment_interpolated, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+readr::write_csv(
+  gas_diagnostics,
+  file.path(output_dir, "washington_gas_model_diagnostics.csv")
+)
+
 event_model <- lm(
   zev_share ~ time_index + I(time_index^2) +
-    calendar_month + covid_disruption + post_credit + post_war,
+    calendar_month + covid_disruption +
+    post_combined_incentive_rolloff + post_war,
   data = analysis_data
 )
 event_vcov <- newey_west_vcov(event_model, lag = 4L)
@@ -221,9 +538,9 @@ readr::write_csv(
 
 period_definitions <- data.frame(
   period = c(
-    "Pre-credit reference",
-    "Credit pull-forward / processing",
-    "Post-credit / pre-war",
+    "Pre-incentive-rolloff reference",
+    "Incentive transition / title processing",
+    "Post-incentive-rolloff / pre-war",
     "Post-war"
   ),
   start = as.Date(c(
@@ -290,7 +607,8 @@ county_period <- county |>
       month >= as.Date("2026-03-01") &
         month <= as.Date("2026-06-01") ~ "Post-war",
       month >= as.Date("2025-11-01") &
-        month <= as.Date("2026-02-01") ~ "Post-credit / pre-war",
+        month <= as.Date("2026-02-01") ~
+        "Post-incentive-rolloff / pre-war",
       TRUE ~ NA_character_
     )
   ) |>
@@ -309,11 +627,14 @@ county_period <- county |>
   ) |>
   dplyr::transmute(
     county,
-    prewar_new_ldv_titles = `new_ldv_titles__Post-credit / pre-war`,
+    prewar_new_ldv_titles =
+      `new_ldv_titles__Post-incentive-rolloff / pre-war`,
     postwar_new_ldv_titles = `new_ldv_titles__Post-war`,
-    prewar_zev_titles = `zev_titles__Post-credit / pre-war`,
+    prewar_zev_titles =
+      `zev_titles__Post-incentive-rolloff / pre-war`,
     postwar_zev_titles = `zev_titles__Post-war`,
-    prewar_zev_share = `zev_share__Post-credit / pre-war`,
+    prewar_zev_share =
+      `zev_share__Post-incentive-rolloff / pre-war`,
     postwar_zev_share = `zev_share__Post-war`,
     change_percentage_points = 100 * (
       postwar_zev_share - prewar_zev_share
@@ -341,7 +662,11 @@ data_audit <- data.frame(
     "benchmark_training_months",
     "rolling_validation_months",
     "selected_benchmark_model",
-    "selected_rolling_rmse"
+    "selected_rolling_rmse",
+    "washington_unemployment_months",
+    "washington_electricity_months",
+    "washington_vmt_months",
+    "prior_3m_gas_rmse_improvement"
   ),
   value = c(
     as.character(min(titles$month)),
@@ -356,7 +681,17 @@ data_audit <- data.frame(
     nrow(benchmark_training),
     rolling_end - rolling_start + 1L,
     selected_name,
-    rolling_rmse
+    rolling_rmse,
+    nrow(unemployment),
+    nrow(electricity),
+    nrow(readr::read_csv(
+      file.path(project_root, "data", "washington_vmt_monthly.csv"),
+      show_col_types = FALSE
+    )),
+    1 - gas_model_comparison$rolling_rmse[
+      gas_model_comparison$model ==
+        "prior_three_month_average_gas"
+    ] / no_gas_rmse
   ),
   stringsAsFactors = FALSE
 )

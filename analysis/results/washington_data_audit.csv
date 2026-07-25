@@ -10,3 +10,7 @@ benchmark_training_months,102
 rolling_validation_months,42
 selected_benchmark_model,quadratic_time_season
 selected_rolling_rmse,0.03658749113128
+washington_unemployment_months,114
+washington_electricity_months,113
+washington_vmt_months,41
+prior_3m_gas_rmse_improvement,0.0793739105737294

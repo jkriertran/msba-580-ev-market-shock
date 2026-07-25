@@ -41,12 +41,27 @@ events <- read_result("washington_event_summary.csv")
 its <- read_result("washington_its_coefficients.csv")
 county <- read_result("washington_county_postwar.csv")
 models <- read_result("washington_model_comparison.csv")
+gas_models <- read_result("washington_gas_model_comparison.csv")
+gas_coefficients <- read_result("washington_gas_model_coefficients.csv")
+gas_sensitivity <- read_result("washington_gas_model_sensitivity.csv")
 conjoint <- read_result("conjoint_partworths.csv")
+vmt <- read.csv(
+  file.path(project_root, "data", "washington_vmt_monthly.csv"),
+  stringsAsFactors = FALSE
+)
+vmt$month <- as.Date(vmt$month)
 
 postwar <- events[events$period == "Post-war", ]
-prewar <- events[events$period == "Post-credit / pre-war", ]
+prewar <- events[
+  events$period == "Post-incentive-rolloff / pre-war",
+]
 war_effect <- its[its$term == "post_war", ]
-credit_effect <- its[its$term == "post_credit", ]
+rolloff_effect <- its[
+  its$term == "post_combined_incentive_rolloff",
+]
+gas_effect <- gas_coefficients[
+  gas_coefficients$term == "gas_price_prior_3m",
+]
 
 paper <- "#f6f1e7"; ink <- "#27241f"; teal <- "#176b68"
 rust <- "#b9472e"; gold <- "#8b6b2f"
@@ -70,9 +85,10 @@ report_theme <- theme_minimal(base_size = 12) +
 
 Washington vehicle manufacturers, dealers, and policy analysts need to know
 whether the early-2026 gasoline-price shock produced a meaningful ZEV-demand
-rebound after the federal purchase credit expired in September 2025. We ask:
+rebound after Washington and federal incentives rolled off in 2025. We ask:
 **Did Washington's share of new light-duty ZEV title transactions rise after
-the war, and was that movement distinguishable from the post-credit market?**
+the war, and was that movement distinguishable from the post-incentive-rolloff
+market?**
 
 The answer is cautious. Washington's pooled ZEV-title share increased from
 13.9% in November 2025–February 2026 to 14.5% in March–June 2026, a 0.56-point
@@ -80,7 +96,8 @@ increase, while average regular gasoline prices rose 33.8%. An interrupted
 time-series model estimates an additional post-war change of 1.15 percentage
 points, but it is not statistically distinct from zero (Newey–West p = 0.285).
 The evidence does not yet show that fuel pressure restored the demand lost
-after the credit expired.
+after incentives rolled off. Lagged gasoline prices add modest predictive
+information, but the result is sensitive to the electricity-price control.
 
 ## Data and definitions
 
@@ -93,8 +110,10 @@ classes. ZEVs include BEVs, PHEVs, and hydrogen fuel-cell vehicles.
 
 This measure is a registration transaction, not a dealer sale date. Title
 processing can lag purchase timing, so October 2025 remains in the
-credit-pull-forward/processing period and the modeled post-credit period begins
-in November. Washington gasoline prices come from the
+incentive-transition/processing period and the modeled post-rolloff period
+begins in November. Washington's clean-vehicle sales-tax exemption ended July
+31, 2025, shortly before the federal credit ended September 30, so their
+effects cannot be separated reliably. Washington gasoline prices come from the
 [U.S. Energy Information Administration](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=EMM_EPMR_PTE_SWA_DPG).
 California Energy Commission quarterly sales are retained only as a neighboring
 comparison because their timing and construction differ.
@@ -109,10 +128,17 @@ the lowest RMSE, 3.66 percentage points, narrowly outperforming the linear
 model's 3.78 points.
 
 The second specification is an interrupted time series using all 114 months.
-It adds post-credit and post-war level indicators to the quadratic trend,
-seasonality, and COVID control. Newey–West standard errors address residual
-autocorrelation. Event coefficients describe deviations associated with each
-period; they do not identify causal effects.
+It adds combined post-incentive-rolloff and post-war level indicators to the
+quadratic trend, seasonality, and COVID control. Newey–West standard errors
+address residual autocorrelation. Event coefficients describe deviations
+associated with each period; they do not identify causal effects.
+
+The third specification tests gasoline-price association. Current and lagged
+gasoline measures are compared using the same rolling window. The
+prior-three-month average performs best and is then fit with trend, seasonality,
+COVID, Washington incentive timing, and the combined rolloff period.
+Washington unemployment, electricity prices, and a post-war indicator are
+added separately as sensitivity checks.
 
 Monthly Washington titles materially improve the study design over the earlier
 California-only quarterly approach. They provide enough pre-event history to
@@ -123,7 +149,7 @@ broad or driven by one large market. California is not pooled into the
 regression: it serves only as a directional comparison because California
 reports inferred sales while Washington reports title transactions.
 
-```{r benchmark, fig.cap="Observed Washington ZEV-title share and the pre-credit benchmark."}
+```{r benchmark, fig.cap="Observed Washington ZEV-title share and the pre-rolloff benchmark."}
 display <- monthly[monthly$month >= as.Date("2021-01-01"), ]
 ggplot(display, aes(month)) +
   geom_ribbon(
@@ -138,7 +164,7 @@ ggplot(display, aes(month)) +
   scale_y_continuous(labels = label_percent(accuracy = 1)) +
   scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
   labs(
-    title = "ZEV title share remained below its pre-credit trajectory",
+    title = "ZEV title share remained below its pre-rolloff trajectory",
     x = NULL, y = "New light-duty ZEV title share"
   ) +
   report_theme
@@ -148,15 +174,26 @@ ggplot(display, aes(month)) +
 
 The benchmark expected a pooled 25.7% ZEV-title share during March–June 2026,
 11.2 points above the observed 14.5%. The interrupted model estimates a
-post-credit level shift of −11.59 points (p < 0.001). Its additional post-war
-coefficient is positive but uncertain: +1.15 points with a 95% interval from
-−0.97 to +3.28 points.
+combined post-incentive-rolloff level shift of −11.59 points (p < 0.001). Its
+additional post-war coefficient is positive but uncertain: +1.15 points with a
+95% interval from −0.97 to +3.28 points.
 
-Gasoline prices averaged $3.90 per gallon in the four post-credit/pre-war
+Gasoline prices averaged $3.90 per gallon in the four post-rolloff/pre-war
 months and $5.22 during the four post-war months. Thus, higher fuel costs
 coincided with only a small title-share increase. This is inconsistent with a
 large immediate fuel-price-driven recovery, although purchasing and title
 processing may respond with longer lags.
+
+The prior-three-month gas measure reduces rolling RMSE from 3.66 to 3.37
+percentage points, a 7.9% improvement. The policy-adjusted estimate is +2.77
+ZEV-share percentage points per $1/gallon (95% CI +0.27 to +5.27; p = 0.031).
+After adding Washington electricity prices, the estimate is +2.00 points and
+its interval includes zero (p = 0.118). The result is therefore a modest,
+specification-sensitive predictive association, not a causal effect.
+
+FHWA VMT was 1.0% below the same month one year earlier in preliminary May 2026
+data. VMT is treated as a separate behavioral outcome rather than a ZEV-share
+control because driving can itself respond to gasoline prices.
 
 County patterns were more favorable but heterogeneous. Thirty-two of 39
 counties increased ZEV-title share, and the median change was +3.34 points.
@@ -195,14 +232,20 @@ whether title share continues improving as gasoline prices remain elevated.
 County-level campaigns are more defensible in markets showing both scale and
 positive movement, such as Pierce, Snohomish, and Clark.
 
-The study is observational. Federal policy, manufacturer incentives, interest
-rates, vehicle prices, model availability, title-processing delays, and the war
-overlap. The post-war period is short, rolling forecast error is material, and
-the conjoint sample is small and partially confounded. Later DOL releases are
-needed before claiming a durable rebound.
+The study is observational. Washington and federal policy, manufacturer
+incentives, interest rates, vehicle prices, model availability, title-processing
+delays, and the war overlap. The state and federal incentive expirations are
+especially difficult to separate. The post-war period is short, the
+gas-association estimate weakens with electricity prices, rolling forecast
+error is material, and the conjoint sample is small and partially confounded.
+Later DOL releases are needed before claiming a durable rebound.
 
 ## Sources
 
 - [Washington Department of Licensing title transactions](https://data.wa.gov/Transportation/Vehicle-Title-Transactions-by-Department-of-Licens/cdk6-5kdf)
 - [EIA Washington regular gasoline prices](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=EMM_EPMR_PTE_SWA_DPG)
+- [BLS Washington unemployment](https://data.bls.gov/timeseries/LAUST530000000000003)
+- [FHWA Traffic Volume Trends](https://www.fhwa.dot.gov/policyinformation/travel_monitoring/tvt.cfm)
+- [Washington clean-vehicle sales-tax exemption](https://dor.wa.gov/forms-publications/publications-subject/special-notices/new-clean-alternative-fuel-and-plug-hybrid-vehicle-sales-and-use-tax-exemption)
+- [Washington EV Instant Rebate](https://www.commerce.wa.gov/clean-transportation/ev-instant-rebate/)
 - [California Energy Commission ZEV sales](https://www.energy.ca.gov/data-reports/energy-almanac/zero-emission-vehicle-and-infrastructure-statistics-collection/new-zev)
