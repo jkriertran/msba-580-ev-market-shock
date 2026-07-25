@@ -192,9 +192,22 @@ h1 { font-family:'DM Serif Display'; font-size:clamp(42px,5vw,74px); line-height
 .evidence-number { font-family:'DM Serif Display'; font-size:24px; }
 .evidence-takeaway { margin:17px 0 0; color:var(--ink); font-size:13px; line-height:1.55; }
 .flag { display:inline-block; margin-top:14px; padding:7px 9px; background:#f0dfc7; color:#713322; font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.benchmark-explainer { margin-top:22px; border:1px solid var(--ink); background:#fffdf8; }
+.explainer-lead { display:grid; grid-template-columns:minmax(145px,.38fr) minmax(0,1.62fr); border-bottom:1px solid var(--ink); }
+.explainer-label { padding:18px 20px; background:var(--rust); color:#fffdf8; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+.explainer-question { padding:16px 22px; font-family:'DM Serif Display'; font-size:20px; line-height:1.25; }
+.explainer-grid { display:grid; grid-template-columns:repeat(4,1fr); }
+.explainer-cell { padding:19px 20px 21px; min-width:0; }
+.explainer-cell + .explainer-cell { border-left:1px solid var(--line); }
+.explainer-number { display:block; margin-bottom:9px; color:var(--rust); font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+.explainer-cell h3 { margin:0 0 8px; font-family:'DM Serif Display'; font-size:18px; }
+.explainer-cell p { margin:0; color:var(--muted); font-size:12px; line-height:1.58; }
+.measurement-equation { display:block; margin:9px 0; padding:8px 10px; border-left:3px solid var(--teal); background:var(--paper); color:var(--ink); font-size:11px; line-height:1.45; }
+.benchmark-guardrail { margin:0; padding:13px 20px; border-top:1px solid var(--line); color:#713322; background:#f0dfc7; font-size:12px; line-height:1.55; }
 .method { border-left:4px solid var(--rust); padding:4px 0 4px 17px; color:var(--muted); font-size:13px; line-height:1.6; }
+@media(max-width:1100px){.explainer-grid{grid-template-columns:repeat(2,1fr)}.explainer-cell:nth-child(3){border-left:0;border-top:1px solid var(--line)}.explainer-cell:nth-child(4){border-top:1px solid var(--line)}}
 @media(max-width:920px){.app-grid,.two-up{grid-template-columns:1fr}.controls{border-right:0;border-bottom:1px solid var(--line);padding:24px 5vw}.controls-inner{position:static}.content{padding:28px 5vw}}
-@media(max-width:620px){.signal-strip{grid-template-columns:1fr}.signal+.signal{border-left:0;border-top:1px solid var(--ink)}}
+@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4){border-left:0;border-top:1px solid var(--line)}}
 "
 
 ui <- fluidPage(
@@ -312,7 +325,8 @@ ui <- fluidPage(
           class = "two-up",
           plotlyOutput("benchmark_plot", height = "440px"),
           uiOutput("regression_evidence")
-        )
+        ),
+        uiOutput("benchmark_explainer")
       ),
       tags$section(
         class = "panel",
@@ -558,6 +572,108 @@ server <- function(input, output, session) {
         )
       ),
       span(class = "flag", "Four post-war months · association, not causation")
+    )
+  })
+
+  output$benchmark_explainer <- renderUI({
+    selected_model <- wa_model_comparison |> filter(selected)
+    empirical_half_width <- 1.96 * selected_model$rolling_rmse
+
+    div(
+      class = "benchmark-explainer",
+      div(
+        class = "explainer-lead",
+        div(class = "explainer-label", "What is measured"),
+        div(
+          class = "explainer-question",
+          paste(
+            "Did Washington's statewide ZEV title share depart from the",
+            "path its pre-credit history would predict?"
+          )
+        )
+      ),
+      div(
+        class = "explainer-grid",
+        div(
+          class = "explainer-cell",
+          span(class = "explainer-number", "01 / Outcome"),
+          h3("Monthly ZEV title share"),
+          span(
+            class = "measurement-equation",
+            "New light-duty BEV + PHEV + FCEV original titles",
+            tags$br(),
+            "÷ all new light-duty original titles"
+          ),
+          p(
+            paste(
+              "This is a statewide registration-transaction measure,",
+              "not a dealer-sales measure."
+            )
+          )
+        ),
+        div(
+          class = "explainer-cell",
+          span(class = "explainer-number", "02 / Benchmark"),
+          h3("Expected without the event terms"),
+          p(
+            paste(
+              "The model learned from January 2017–June 2025:",
+              "a quadratic adoption trend, calendar-month seasonality,",
+              "and a COVID disruption indicator. It was selected using",
+              "42 rolling one-month-ahead forecasts."
+            )
+          )
+        ),
+        div(
+          class = "explainer-cell",
+          span(class = "explainer-number", "03 / Read the chart"),
+          h3("Observed versus expected"),
+          p(
+            paste0(
+              "Teal is observed share; gold is expected share. The pale band ",
+              "is an empirical forecast-error band of ±", number(
+                100 * empirical_half_width,
+                accuracy = .1
+              ), " percentage points—not a causal confidence interval. ",
+              "Dashed marks the post-credit title period; dotted marks post-war."
+            )
+          )
+        ),
+        div(
+          class = "explainer-cell",
+          span(class = "explainer-number", "04 / Finding"),
+          h3("No distinct post-war rebound yet"),
+          p(
+            paste0(
+              "For March–June 2026, observed share was ",
+              percent(postwar$pooled_zev_share, accuracy = .1),
+              " versus ", percent(postwar$mean_expected_zev_share, accuracy = .1),
+              " expected; observed minus expected was ", number(
+                100 * postwar$observed_minus_expected,
+                accuracy = .1,
+                suffix = " pp"
+              ), ". The additional post-war estimate was ",
+              number(100 * war_coefficient$estimate, accuracy = .1, suffix = " pp"),
+              " (95% CI ", number(
+                100 * war_coefficient$confidence_low,
+                accuracy = .1
+              ), " to ", number(
+                100 * war_coefficient$confidence_high,
+                accuracy = .1
+              ), "; p = ", number(war_coefficient$p_value, accuracy = .001), ")."
+            )
+          )
+        )
+      ),
+      p(
+        class = "benchmark-guardrail",
+        strong("Important distinction: "),
+        paste(
+          "gasoline price is context, not a predictor in this regression.",
+          "The panel does not estimate the effect of a $1 gas-price increase",
+          "and does not prove that the credit expiration or war caused the change."
+        )
+      )
     )
   })
 
