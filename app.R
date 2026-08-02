@@ -735,7 +735,10 @@ ui <- fluidPage(
               "The explorer applies fitted associations inside the historical",
               "input range. It does not simulate market equilibrium, establish",
               "causality, or display a scenario interval because the full",
-              "coefficient covariance matrix is not saved with the app."
+              "coefficient covariance matrix is not saved with the app.",
+              "Policy-term signs are conditional associations and may be",
+              "counterintuitive when incentive timing overlaps with trend and",
+              "other market changes."
             )
           )
         )
