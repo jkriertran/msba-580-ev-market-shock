@@ -124,10 +124,11 @@ gas_beta_value <- function(term) {
 scenario_rows <- wa_monthly |>
   filter(!is.na(gas_price_prior_3m))
 scenario_baseline <- scenario_rows |>
-  filter(month == latest_month)
-scenario_gas_limits <- range(
-  scenario_rows$gas_price_prior_3m,
-  na.rm = TRUE
+  filter(month == latest_month) |>
+  mutate(gas_price_prior_3m = round(gas_price_prior_3m, 2))
+scenario_gas_limits <- round(
+  range(scenario_rows$gas_price_prior_3m, na.rm = TRUE),
+  2
 )
 scenario_month_choices <- setNames(
   as.character(scenario_rows$month),
