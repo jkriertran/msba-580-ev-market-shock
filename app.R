@@ -544,7 +544,91 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "02 / Regression benchmark"),
+        div(class = "section-kicker", "02 / Behavioral response"),
+        h2(class = "panel-title", "Did Washingtonians drive less?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "Monthly Washington vehicle miles traveled compared with the",
+            "same month one year earlier. VMT is a separate outcome, not a",
+            "control in the ZEV-title regression."
+          )
+        ),
+        plotlyOutput("vmt_plot", height = "410px"),
+        calculation_note(
+          title = "Year-over-year change in vehicle miles traveled",
+          measure = p(
+            "The bars compare total Washington vehicle miles traveled with the ",
+            "same calendar month one year earlier, which controls for recurring ",
+            "seasonal driving patterns."
+          ),
+          formula = code(
+            "VMT YoY_t = ((VMT_t / VMT_{t-12}) - 1) × 100"
+          ),
+          variables = tagList(
+            p(strong("VMT_t: "), "million vehicle miles in the current month."),
+            p(
+              strong("VMT_{t-12}: "),
+              "million vehicle miles in the same month one year earlier."
+            )
+          ),
+          interpretation = p(
+            "A negative value means less total driving than in the same month ",
+            "last year. This tests behavioral response, not vehicle choice."
+          ),
+          caution = paste(
+            "VMT is kept out of the ZEV-title model because it may occur after",
+            "a fuel-price shock and could mediate the relationship of interest.",
+            "May 2026 is preliminary."
+          )
+        )
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "03 / California comparison"),
+        h2(class = "panel-title", "Did the neighboring market move similarly?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "Both series are indexed to 100 in 2025 Q4.",
+            "Washington titles and California CEC-inferred sales are",
+            "directionally comparable but not identical measures."
+          )
+        ),
+        plotlyOutput("state_comparison_plot", height = "390px"),
+        calculation_note(
+          title = "Quarterly shares indexed to a common baseline",
+          measure = p(
+            "Each state's quarterly ZEV share is expressed relative to its own ",
+            "2025 Q4 value. Indexing makes direction and proportional movement ",
+            "comparable despite different starting shares."
+          ),
+          formula = tagList(
+            code("quarterly share_s,q = sum(ZEV) / sum(all eligible vehicles)"),
+            tags$br(),
+            code("index_s,q = 100 × share_s,q / share_s,2025Q4")
+          ),
+          variables = tagList(
+            p(strong("s: "), "state; q: quarter."),
+            p(
+              strong("Washington: "),
+              "new light-duty original-title share."
+            ),
+            p(strong("California: "), "CEC-inferred new-vehicle sales share.")
+          ),
+          interpretation = p(
+            "An index of 110 means the state's share is 10% above its own 2025 ",
+            "Q4 level. It does not mean ZEV share is 110%."
+          ),
+          caution = paste(
+            "The states use related but non-identical measures. Compare movement",
+            "and timing, not absolute share levels."
+          )
+        )
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "04 / Regression benchmark"),
         h2(class = "panel-title", "Observed share versus pre-rolloff expectation"),
         p(
           class = "panel-subtitle",
@@ -602,7 +686,7 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "03 / Gas-price association"),
+        div(class = "section-kicker", "05 / Gas-price association"),
         h2(class = "panel-title", "Did gasoline prices add predictive signal?"),
         p(
           class = "panel-subtitle",
@@ -745,48 +829,7 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "04 / Behavioral response"),
-        h2(class = "panel-title", "Did Washingtonians drive less?"),
-        p(
-          class = "panel-subtitle",
-          paste(
-            "Monthly Washington vehicle miles traveled compared with the",
-            "same month one year earlier. VMT is a separate outcome, not a",
-            "control in the ZEV-title regression."
-          )
-        ),
-        plotlyOutput("vmt_plot", height = "410px"),
-        calculation_note(
-          title = "Year-over-year change in vehicle miles traveled",
-          measure = p(
-            "The bars compare total Washington vehicle miles traveled with the ",
-            "same calendar month one year earlier, which controls for recurring ",
-            "seasonal driving patterns."
-          ),
-          formula = code(
-            "VMT YoY_t = ((VMT_t / VMT_{t-12}) - 1) × 100"
-          ),
-          variables = tagList(
-            p(strong("VMT_t: "), "million vehicle miles in the current month."),
-            p(
-              strong("VMT_{t-12}: "),
-              "million vehicle miles in the same month one year earlier."
-            )
-          ),
-          interpretation = p(
-            "A negative value means less total driving than in the same month ",
-            "last year. This tests behavioral response, not vehicle choice."
-          ),
-          caution = paste(
-            "VMT is kept out of the ZEV-title model because it may occur after",
-            "a fuel-price shock and could mediate the relationship of interest.",
-            "May 2026 is preliminary."
-          )
-        )
-      ),
-      tags$section(
-        class = "panel",
-        div(class = "section-kicker", "05 / County response"),
+        div(class = "section-kicker", "06 / County response"),
         h2(class = "panel-title", "Where did ZEV title share change?"),
         p(
           class = "panel-subtitle",
@@ -822,49 +865,6 @@ ui <- fluidPage(
           caution = paste(
             "County changes are descriptive and can be volatile in smaller",
             "markets. Unknown or out-of-state geography is excluded."
-          )
-        )
-      ),
-      tags$section(
-        class = "panel",
-        div(class = "section-kicker", "06 / California comparison"),
-        h2(class = "panel-title", "Did the neighboring market move similarly?"),
-        p(
-          class = "panel-subtitle",
-          paste(
-            "Both series are indexed to 100 in 2025 Q4.",
-            "Washington titles and California CEC-inferred sales are",
-            "directionally comparable but not identical measures."
-          )
-        ),
-        plotlyOutput("state_comparison_plot", height = "390px"),
-        calculation_note(
-          title = "Quarterly shares indexed to a common baseline",
-          measure = p(
-            "Each state's quarterly ZEV share is expressed relative to its own ",
-            "2025 Q4 value. Indexing makes direction and proportional movement ",
-            "comparable despite different starting shares."
-          ),
-          formula = tagList(
-            code("quarterly share_s,q = sum(ZEV) / sum(all eligible vehicles)"),
-            tags$br(),
-            code("index_s,q = 100 × share_s,q / share_s,2025Q4")
-          ),
-          variables = tagList(
-            p(strong("s: "), "state; q: quarter."),
-            p(
-              strong("Washington: "),
-              "new light-duty original-title share."
-            ),
-            p(strong("California: "), "CEC-inferred new-vehicle sales share.")
-          ),
-          interpretation = p(
-            "An index of 110 means the state's share is 10% above its own 2025 ",
-            "Q4 level. It does not mean ZEV share is 110%."
-          ),
-          caution = paste(
-            "The states use related but non-identical measures. Compare movement",
-            "and timing, not absolute share levels."
           )
         )
       ),
