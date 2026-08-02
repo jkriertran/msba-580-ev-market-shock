@@ -111,6 +111,66 @@ gas_coefficient <- wa_gas_coefficients |>
 gas_electricity_sensitivity <- wa_gas_sensitivity |>
   filter(model == "plus_electricity")
 
+gas_model_beta <- setNames(
+  wa_gas_coefficients$estimate,
+  wa_gas_coefficients$term
+)
+
+gas_beta_value <- function(term) {
+  value <- gas_model_beta[[term]]
+  if (is.null(value) || is.na(value)) 0 else unname(value)
+}
+
+scenario_rows <- wa_monthly |>
+  filter(!is.na(gas_price_prior_3m))
+scenario_baseline <- scenario_rows |>
+  filter(month == latest_month)
+scenario_gas_limits <- range(
+  scenario_rows$gas_price_prior_3m,
+  na.rm = TRUE
+)
+scenario_month_choices <- setNames(
+  as.character(scenario_rows$month),
+  format(scenario_rows$month, "%B %Y")
+)
+
+scenario_policy_profiles <- tibble::tribble(
+  ~policy_profile, ~policy_label, ~wa_sales_tax_exemption_active,
+  ~wa_instant_rebate_active, ~combined_incentive_transition,
+  ~post_combined_incentive_rolloff,
+  "incentives_active", "WA tax exemption + instant rebate active", 1, 1, 0, 0,
+  "tax_only", "WA sales-tax exemption only", 1, 0, 0, 0,
+  "transition", "Combined incentive transition", 0, 0, 1, 0,
+  "post_rolloff", "Post-incentive-rolloff", 0, 0, 0, 1
+)
+scenario_policy_choices <- setNames(
+  scenario_policy_profiles$policy_profile,
+  scenario_policy_profiles$policy_label
+)
+
+predict_gas_scenario <- function(data) {
+  calendar_terms <- paste0("calendar_month", data$calendar_month)
+  calendar_effect <- unname(gas_model_beta[calendar_terms])
+  calendar_effect[is.na(calendar_effect)] <- 0
+
+  gas_beta_value("(Intercept)") +
+    gas_beta_value("time_centered") * data$time_centered +
+    gas_beta_value("I(time_centered^2)") * data$time_centered^2 +
+    calendar_effect +
+    gas_beta_value("covid_disruption") * data$covid_disruption +
+    gas_beta_value("wa_sales_tax_exemption_active") *
+      data$wa_sales_tax_exemption_active +
+    gas_beta_value("wa_instant_rebate_active") *
+      data$wa_instant_rebate_active +
+    gas_beta_value("combined_incentive_transition") *
+      data$combined_incentive_transition +
+    gas_beta_value("post_combined_incentive_rolloff") *
+      data$post_combined_incentive_rolloff +
+    gas_beta_value("gas_price_prior_3m") * data$gas_price_prior_3m
+}
+
+scenario_baseline_prediction <- predict_gas_scenario(scenario_baseline)
+
 metric_config <- list(
   zev_share = list(
     label = "New light-duty ZEV title share",
@@ -298,6 +358,32 @@ h1 { font-family:'DM Serif Display'; font-size:clamp(42px,5vw,74px); line-height
 .formula-box { padding:11px 13px; border-left:3px solid var(--teal); background:var(--paper); color:var(--ink); font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace; font-size:11px; line-height:1.65; overflow-wrap:anywhere; }
 .formula-box code { padding:0; color:inherit; background:transparent; font:inherit; white-space:normal; }
 .calculation-caution { padding:13px 20px; border-top:1px solid var(--line); background:#f0dfc7; color:#713322; font-size:12px; line-height:1.55; }
+.scenario-lab { margin-top:26px; border:1px solid var(--ink); background:#fffdf8; }
+.scenario-lab-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:22px; align-items:end; padding:22px 24px; border-bottom:1px solid var(--ink); }
+.scenario-lab-header h3 { margin:5px 0 5px; font-family:'DM Serif Display'; font-size:25px; }
+.scenario-lab-header p { max-width:760px; margin:0; color:var(--muted); font-size:13px; line-height:1.55; }
+.scenario-badge { align-self:start; padding:7px 9px; background:var(--teal); color:#fffdf8; font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
+.scenario-layout { display:grid; grid-template-columns:minmax(245px,.55fr) minmax(0,1.45fr); }
+.scenario-controls { padding:22px 24px 25px; border-right:1px solid var(--line); background:var(--deep); }
+.scenario-controls h4 { margin:0 0 17px; color:var(--rust); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+.scenario-controls .form-group { margin-bottom:20px; }
+.scenario-controls .control-label { line-height:1.4; }
+.scenario-controls .irs-bar,.scenario-controls .irs-bar-edge { background:var(--teal); border-color:var(--teal); }
+.scenario-controls .irs-single { background:var(--teal); }
+.scenario-controls .irs-single:after { border-top-color:var(--teal); }
+.scenario-reset { width:100%; border:1px solid var(--ink); border-radius:0; background:#fffdf8; color:var(--ink); font-size:11px; font-weight:600; }
+.scenario-reset:hover,.scenario-reset:focus { border-color:var(--teal); background:#fff; color:var(--teal); }
+.scenario-results { padding:22px 24px 12px; min-width:0; }
+.scenario-metrics { display:grid; grid-template-columns:repeat(3,1fr); margin-bottom:14px; border:1px solid var(--line); }
+.scenario-metric { padding:15px 17px; min-width:0; }
+.scenario-metric + .scenario-metric { border-left:1px solid var(--line); }
+.scenario-metric-label { color:var(--muted); font-size:9px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; }
+.scenario-metric-value { margin:5px 0 3px; font-family:'DM Serif Display'; font-size:27px; line-height:1.1; }
+.scenario-metric-note { color:var(--muted); font-size:10px; line-height:1.4; }
+.scenario-curve { padding:19px 24px 4px; border-top:1px solid var(--line); }
+.scenario-chart-title { margin:0 0 4px; font-family:'DM Serif Display'; font-size:19px; }
+.scenario-chart-copy { margin:0 0 6px; color:var(--muted); font-size:11px; line-height:1.5; }
+.scenario-guardrail { margin:0; padding:13px 24px; border-top:1px solid var(--line); background:#f0dfc7; color:#713322; font-size:12px; line-height:1.55; }
 .methods-reference { margin:45px 0 30px; padding-top:18px; border-top:3px solid var(--ink); }
 .methods-reference h2 { margin:4px 0 8px; font-family:'DM Serif Display'; font-size:27px; }
 .methods-intro { max-width:780px; margin:0 0 18px; color:var(--muted); line-height:1.55; }
@@ -308,8 +394,8 @@ h1 { font-family:'DM Serif Display'; font-size:clamp(42px,5vw,74px); line-height
 .method-card p { margin:0; color:var(--muted); font-size:12px; line-height:1.58; }
 .method-tag { display:block; margin-bottom:8px; color:var(--rust); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
 @media(max-width:1100px){.explainer-grid{grid-template-columns:repeat(2,1fr)}.explainer-cell:nth-child(3){border-left:0;border-top:1px solid var(--line)}.explainer-cell:nth-child(4){border-top:1px solid var(--line)}.methods-grid{grid-template-columns:1fr}.method-card+.method-card{border-left:0;border-top:1px solid var(--line)}}
-@media(max-width:920px){.app-grid,.two-up{grid-template-columns:1fr}.controls{border-right:0;border-bottom:1px solid var(--line);padding:24px 5vw}.controls-inner{position:static}.content{padding:28px 5vw}}
-@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid,.calculation-body{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4),.calculation-cell:nth-child(even){border-left:0}.calculation-cell+.calculation-cell{border-top:1px solid var(--line)}.calculation-note summary{grid-template-columns:1fr auto}.calculation-label{grid-column:1/-1}.calculation-title{font-size:16px}}
+@media(max-width:920px){.app-grid,.two-up,.scenario-layout{grid-template-columns:1fr}.controls{border-right:0;border-bottom:1px solid var(--line);padding:24px 5vw}.controls-inner{position:static}.content{padding:28px 5vw}.scenario-controls{border-right:0;border-bottom:1px solid var(--line)}}
+@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid,.calculation-body,.scenario-metrics,.scenario-lab-header{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4),.calculation-cell:nth-child(even),.scenario-metric+.scenario-metric{border-left:0}.calculation-cell+.calculation-cell,.scenario-metric+.scenario-metric{border-top:1px solid var(--line)}.calculation-note summary{grid-template-columns:1fr auto}.calculation-label{grid-column:1/-1}.calculation-title{font-size:16px}.scenario-badge{justify-self:start}}
 "
 
 ui <- fluidPage(
@@ -562,6 +648,94 @@ ui <- fluidPage(
           caution = paste(
             "This is a predictive association. Fuel prices can move with other",
             "economic conditions, and the estimate changes across specifications."
+          )
+        ),
+        div(
+          class = "scenario-lab",
+          div(
+            class = "scenario-lab-header",
+            div(
+              div(class = "section-kicker", "Interactive model lab"),
+              h3("What changes the model's predicted ZEV title share?"),
+              p(
+                paste(
+                  "Adjust a valid policy regime, title month, and the prior-three-month",
+                  "gasoline price. The charts recalculate the fitted policy-adjusted",
+                  "regression while holding all other inputs at the selected scenario."
+                )
+              )
+            ),
+            span(class = "scenario-badge", "Model scenario, not causal")
+          ),
+          div(
+            class = "scenario-layout",
+            div(
+              class = "scenario-controls",
+              h4("Scenario inputs"),
+              selectInput(
+                "scenario_month",
+                "Title month (trend, seasonality, and COVID timing)",
+                choices = scenario_month_choices,
+                selected = as.character(latest_month)
+              ),
+              sliderInput(
+                "scenario_gas",
+                "Average gasoline price in the prior three months",
+                min = scenario_gas_limits[1],
+                max = scenario_gas_limits[2],
+                value = scenario_baseline$gas_price_prior_3m,
+                step = .01,
+                round = 2,
+                pre = "$"
+              ),
+              selectInput(
+                "scenario_policy",
+                "Washington incentive regime",
+                choices = scenario_policy_choices,
+                selected = "post_rolloff"
+              ),
+              actionButton(
+                "reset_scenario",
+                "Reset to June 2026 baseline",
+                class = "scenario-reset"
+              )
+            ),
+            div(
+              class = "scenario-results",
+              uiOutput("scenario_summary"),
+              h4(class = "scenario-chart-title", "Contribution to change from baseline"),
+              p(
+                class = "scenario-chart-copy",
+                paste(
+                  "Bars show how each model term moves predicted share relative",
+                  "to the June 2026 observed-input baseline. They sum to the",
+                  "displayed scenario change."
+                )
+              ),
+              plotlyOutput("scenario_contribution_plot", height = "330px")
+            )
+          ),
+          div(
+            class = "scenario-curve",
+            h4(class = "scenario-chart-title", "Gas-price response curve"),
+            p(
+              class = "scenario-chart-copy",
+              paste(
+                "The line varies only the gasoline-price input; title month and",
+                "policy regime stay fixed at the selected values."
+              )
+            ),
+            plotlyOutput("scenario_response_plot", height = "330px")
+          ),
+          p(
+            class = "scenario-guardrail",
+            strong("Use with care: "),
+            paste(
+              "The explorer applies fitted associations inside the historical",
+              "input range. It does not simulate market equilibrium, establish",
+              "causality, or display a scenario interval because the full",
+              "coefficient covariance matrix is not saved with the app."
+            )
           )
         )
       ),
@@ -1222,6 +1396,277 @@ server <- function(input, output, session) {
       )
     )
   })
+
+  scenario_state <- reactive({
+    req(input$scenario_month, input$scenario_gas, input$scenario_policy)
+    month_row <- scenario_rows |>
+      filter(month == as.Date(input$scenario_month)) |>
+      slice(1)
+    policy_row <- scenario_policy_profiles |>
+      filter(policy_profile == input$scenario_policy) |>
+      slice(1)
+
+    month_row |>
+      mutate(
+        gas_price_prior_3m = input$scenario_gas,
+        wa_sales_tax_exemption_active =
+          policy_row$wa_sales_tax_exemption_active,
+        wa_instant_rebate_active = policy_row$wa_instant_rebate_active,
+        combined_incentive_transition =
+          policy_row$combined_incentive_transition,
+        post_combined_incentive_rolloff =
+          policy_row$post_combined_incentive_rolloff,
+        policy_label = policy_row$policy_label
+      )
+  })
+
+  scenario_contributions <- reactive({
+    scenario <- scenario_state()
+    baseline <- scenario_baseline
+    scenario_month_effect <- gas_beta_value(
+      paste0("calendar_month", scenario$calendar_month)
+    )
+    baseline_month_effect <- gas_beta_value(
+      paste0("calendar_month", baseline$calendar_month)
+    )
+
+    tibble(
+      variable = c(
+        "Adoption trend",
+        "Calendar month",
+        "COVID disruption",
+        "WA sales-tax exemption",
+        "WA instant rebate",
+        "Incentive transition",
+        "Post-rolloff period",
+        "Prior-three-month gas price"
+      ),
+      impact_share = c(
+        gas_beta_value("time_centered") *
+          (scenario$time_centered - baseline$time_centered) +
+          gas_beta_value("I(time_centered^2)") *
+          (scenario$time_centered^2 - baseline$time_centered^2),
+        scenario_month_effect - baseline_month_effect,
+        gas_beta_value("covid_disruption") *
+          (scenario$covid_disruption - baseline$covid_disruption),
+        gas_beta_value("wa_sales_tax_exemption_active") *
+          (
+            scenario$wa_sales_tax_exemption_active -
+              baseline$wa_sales_tax_exemption_active
+          ),
+        gas_beta_value("wa_instant_rebate_active") *
+          (
+            scenario$wa_instant_rebate_active -
+              baseline$wa_instant_rebate_active
+          ),
+        gas_beta_value("combined_incentive_transition") *
+          (
+            scenario$combined_incentive_transition -
+              baseline$combined_incentive_transition
+          ),
+        gas_beta_value("post_combined_incentive_rolloff") *
+          (
+            scenario$post_combined_incentive_rolloff -
+              baseline$post_combined_incentive_rolloff
+          ),
+        gas_beta_value("gas_price_prior_3m") *
+          (scenario$gas_price_prior_3m - baseline$gas_price_prior_3m)
+      )
+    ) |>
+      mutate(
+        impact_pp = 100 * impact_share,
+        direction = case_when(
+          impact_pp > 1e-8 ~ "Raises predicted share",
+          impact_pp < -1e-8 ~ "Lowers predicted share",
+          TRUE ~ "No change from baseline"
+        ),
+        tooltip = paste0(
+          variable,
+          "<br>Contribution: ",
+          if_else(impact_pp > 0, "+", ""),
+          number(impact_pp, accuracy = .01),
+          " percentage points"
+        )
+      )
+  })
+
+  output$scenario_summary <- renderUI({
+    scenario <- scenario_state()
+    prediction <- predict_gas_scenario(scenario)
+    change <- prediction - scenario_baseline_prediction
+    contributions <- scenario_contributions()
+    if (max(abs(contributions$impact_pp)) < 1e-8) {
+      driver_label <- "At baseline"
+      driver_note <- "Change an input to reveal its contribution"
+    } else {
+      top_driver <- contributions |>
+        slice_max(abs(impact_pp), n = 1, with_ties = FALSE)
+      driver_label <- top_driver$variable
+      driver_note <- paste0(
+        if_else(top_driver$impact_pp > 0, "+", ""),
+        number(top_driver$impact_pp, accuracy = .1),
+        " pp versus baseline"
+      )
+    }
+    change_label <- paste0(
+      if_else(change > 0, "+", ""),
+      number(100 * change, accuracy = .1),
+      " pp"
+    )
+
+    div(
+      class = "scenario-metrics",
+      div(
+        class = "scenario-metric",
+        div(class = "scenario-metric-label", "Predicted ZEV title share"),
+        div(
+          class = "scenario-metric-value",
+          percent(prediction, accuracy = .1)
+        ),
+        div(
+          class = "scenario-metric-note",
+          paste(format(scenario$month, "%B %Y"), "scenario")
+        )
+      ),
+      div(
+        class = "scenario-metric",
+        div(class = "scenario-metric-label", "Change from model baseline"),
+        div(class = "scenario-metric-value", change_label),
+        div(
+          class = "scenario-metric-note",
+          paste0(
+            "June 2026 baseline: ",
+            percent(scenario_baseline_prediction, accuracy = .1)
+          )
+        )
+      ),
+      div(
+        class = "scenario-metric",
+        div(class = "scenario-metric-label", "Largest contribution"),
+        div(class = "scenario-metric-value", driver_label),
+        div(class = "scenario-metric-note", driver_note)
+      )
+    )
+  })
+
+  output$scenario_contribution_plot <- renderPlotly({
+    display <- scenario_contributions() |>
+      arrange(abs(impact_pp)) |>
+      mutate(variable = factor(variable, levels = variable))
+    x_extent <- max(abs(display$impact_pp), .5)
+
+    plot <- ggplot(
+      display,
+      aes(
+        y = variable,
+        x = impact_pp,
+        color = direction,
+        text = tooltip
+      )
+    ) +
+      geom_vline(xintercept = 0, color = muted, linewidth = .5) +
+      geom_segment(
+        aes(x = 0, xend = impact_pp, yend = variable),
+        linewidth = 2.3,
+        alpha = .45
+      ) +
+      geom_point(size = 3.2) +
+      scale_color_manual(values = c(
+        "Raises predicted share" = teal,
+        "Lowers predicted share" = rust,
+        "No change from baseline" = muted
+      )) +
+      scale_x_continuous(
+        limits = c(-1.12 * x_extent, 1.12 * x_extent),
+        labels = label_number(accuracy = .1, suffix = " pp")
+      ) +
+      labs(x = "Contribution to predicted-share change", y = NULL) +
+      theme_editorial() +
+      theme(legend.position = "none")
+
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
+
+  output$scenario_response_plot <- renderPlotly({
+    scenario <- scenario_state()
+    gas_values <- seq(
+      scenario_gas_limits[1],
+      scenario_gas_limits[2],
+      length.out = 80
+    )
+    response_grid <- scenario[rep(1, length(gas_values)), ]
+    response_grid$gas_price_prior_3m <- gas_values
+    response_grid$predicted_share <- predict_gas_scenario(response_grid)
+    response_grid$tooltip <- paste0(
+      "Prior-three-month gas: ",
+      dollar(response_grid$gas_price_prior_3m, accuracy = .01),
+      "<br>Predicted ZEV share: ",
+      percent(response_grid$predicted_share, accuracy = .1)
+    )
+    selected_point <- scenario |>
+      mutate(
+        predicted_share = predict_gas_scenario(scenario),
+        tooltip = paste0(
+          "Selected scenario",
+          "<br>Gas price: ",
+          dollar(gas_price_prior_3m, accuracy = .01),
+          "<br>Predicted ZEV share: ",
+          percent(predicted_share, accuracy = .1)
+        )
+      )
+
+    plot <- ggplot(
+      response_grid,
+      aes(gas_price_prior_3m, predicted_share, text = tooltip)
+    ) +
+      geom_line(color = teal, linewidth = 1.2) +
+      geom_vline(
+        xintercept = scenario$gas_price_prior_3m,
+        color = rust,
+        linetype = "dotted"
+      ) +
+      geom_point(
+        data = selected_point,
+        aes(gas_price_prior_3m, predicted_share, text = tooltip),
+        color = rust,
+        size = 3.4
+      ) +
+      scale_x_continuous(labels = label_dollar(accuracy = .10)) +
+      scale_y_continuous(labels = label_percent(accuracy = 1)) +
+      labs(
+        x = "Average regular gasoline price in prior three months",
+        y = "Model-predicted ZEV title share",
+        caption = paste(
+          "Selected month:",
+          format(scenario$month, "%B %Y"),
+          "· Policy regime:",
+          scenario$policy_label
+        )
+      ) +
+      theme_editorial()
+
+    ggplotly(plot, tooltip = "text") |>
+      config(displayModeBar = FALSE)
+  })
+
+  observeEvent(input$reset_scenario, {
+    updateSelectInput(
+      session,
+      "scenario_month",
+      selected = as.character(latest_month)
+    )
+    updateSliderInput(
+      session,
+      "scenario_gas",
+      value = scenario_baseline$gas_price_prior_3m
+    )
+    updateSelectInput(
+      session,
+      "scenario_policy",
+      selected = "post_rolloff"
+    )
+  }, ignoreInit = TRUE)
 
   output$vmt_plot <- renderPlotly({
     display <- wa_vmt |>
