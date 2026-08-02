@@ -178,6 +178,54 @@ quarter_axis <- function(x) {
   )
 }
 
+calculation_note <- function(
+  title,
+  measure,
+  formula,
+  variables,
+  interpretation,
+  caution = NULL
+) {
+  tags$details(
+    class = "calculation-note",
+    tags$summary(
+      span(class = "calculation-label", "How this chart is calculated"),
+      span(class = "calculation-title", title),
+      span(class = "calculation-action", "View method")
+    ),
+    div(
+      class = "calculation-body",
+      div(
+        class = "calculation-cell",
+        h3("Measure"),
+        div(class = "calculation-copy", measure)
+      ),
+      div(
+        class = "calculation-cell calculation-formula-cell",
+        h3("Calculation"),
+        div(class = "formula-box", formula)
+      ),
+      div(
+        class = "calculation-cell",
+        h3("Variables that matter"),
+        div(class = "calculation-copy", variables)
+      ),
+      div(
+        class = "calculation-cell",
+        h3("How to interpret it"),
+        div(class = "calculation-copy", interpretation)
+      )
+    ),
+    if (!is.null(caution)) {
+      div(
+        class = "calculation-caution",
+        strong("Guardrail: "),
+        caution
+      )
+    }
+  )
+}
+
 app_css <- "
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 :root { --ink:#171510; --paper:#f6f1e7; --deep:#ebe2d3; --rust:#b9472e; --teal:#176b68; --muted:#6f685e; --line:#cfc5b6; }
@@ -229,9 +277,39 @@ h1 { font-family:'DM Serif Display'; font-size:clamp(42px,5vw,74px); line-height
 .measurement-equation { display:block; margin:9px 0; padding:8px 10px; border-left:3px solid var(--teal); background:var(--paper); color:var(--ink); font-size:11px; line-height:1.45; }
 .benchmark-guardrail { margin:0; padding:13px 20px; border-top:1px solid var(--line); color:#713322; background:#f0dfc7; font-size:12px; line-height:1.55; }
 .method { border-left:4px solid var(--rust); padding:4px 0 4px 17px; color:var(--muted); font-size:13px; line-height:1.6; }
-@media(max-width:1100px){.explainer-grid{grid-template-columns:repeat(2,1fr)}.explainer-cell:nth-child(3){border-left:0;border-top:1px solid var(--line)}.explainer-cell:nth-child(4){border-top:1px solid var(--line)}}
+.calculation-note { margin-top:16px; border:1px solid var(--line); background:#fffdf8; }
+.calculation-note summary { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:14px; align-items:center; padding:15px 18px; cursor:pointer; list-style:none; }
+.calculation-note summary::-webkit-details-marker { display:none; }
+.calculation-note summary:focus-visible { outline:3px solid rgba(23,107,104,.32); outline-offset:2px; }
+.calculation-label { color:var(--teal); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+.calculation-title { color:var(--ink); font-family:'DM Serif Display'; font-size:17px; line-height:1.25; }
+.calculation-action { color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.04em; white-space:nowrap; }
+.calculation-action:after { content:' +'; color:var(--rust); font-size:16px; }
+.calculation-note[open] .calculation-action:after { content:' −'; }
+.calculation-note[open] summary { border-bottom:1px solid var(--ink); }
+.calculation-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.calculation-cell { padding:18px 20px 20px; min-width:0; }
+.calculation-cell:nth-child(even) { border-left:1px solid var(--line); }
+.calculation-cell:nth-child(n+3) { border-top:1px solid var(--line); }
+.calculation-cell h3 { margin:0 0 8px; color:var(--rust); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+.calculation-copy { color:var(--muted); font-size:12px; line-height:1.6; }
+.calculation-copy p { margin:0 0 8px; }
+.calculation-copy p:last-child { margin-bottom:0; }
+.formula-box { padding:11px 13px; border-left:3px solid var(--teal); background:var(--paper); color:var(--ink); font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace; font-size:11px; line-height:1.65; overflow-wrap:anywhere; }
+.formula-box code { padding:0; color:inherit; background:transparent; font:inherit; white-space:normal; }
+.calculation-caution { padding:13px 20px; border-top:1px solid var(--line); background:#f0dfc7; color:#713322; font-size:12px; line-height:1.55; }
+.methods-reference { margin:45px 0 30px; padding-top:18px; border-top:3px solid var(--ink); }
+.methods-reference h2 { margin:4px 0 8px; font-family:'DM Serif Display'; font-size:27px; }
+.methods-intro { max-width:780px; margin:0 0 18px; color:var(--muted); line-height:1.55; }
+.methods-grid { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--ink); background:#fffdf8; }
+.method-card { padding:19px 20px 21px; }
+.method-card + .method-card { border-left:1px solid var(--line); }
+.method-card h3 { margin:0 0 8px; font-family:'DM Serif Display'; font-size:19px; }
+.method-card p { margin:0; color:var(--muted); font-size:12px; line-height:1.58; }
+.method-tag { display:block; margin-bottom:8px; color:var(--rust); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+@media(max-width:1100px){.explainer-grid{grid-template-columns:repeat(2,1fr)}.explainer-cell:nth-child(3){border-left:0;border-top:1px solid var(--line)}.explainer-cell:nth-child(4){border-top:1px solid var(--line)}.methods-grid{grid-template-columns:1fr}.method-card+.method-card{border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:920px){.app-grid,.two-up{grid-template-columns:1fr}.controls{border-right:0;border-bottom:1px solid var(--line);padding:24px 5vw}.controls-inner{position:static}.content{padding:28px 5vw}}
-@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4){border-left:0;border-top:1px solid var(--line)}}
+@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid,.calculation-body{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4),.calculation-cell:nth-child(even){border-left:0}.calculation-cell+.calculation-cell{border-top:1px solid var(--line)}.calculation-note summary{grid-template-columns:1fr auto}.calculation-label{grid-column:1/-1}.calculation-title{font-size:16px}}
 "
 
 ui <- fluidPage(
@@ -340,7 +418,42 @@ ui <- fluidPage(
         div(class = "section-kicker", "01 / Monthly market"),
         h2(class = "panel-title", textOutput("timeline_title", inline = TRUE)),
         p(class = "panel-subtitle", textOutput("timeline_subtitle", inline = TRUE)),
-        plotlyOutput("market_plot", height = "430px")
+        plotlyOutput("market_plot", height = "430px"),
+        calculation_note(
+          title = "Monthly titles, title share, and gasoline price",
+          measure = tagList(
+            p(
+              "The selector displays a monthly transaction count, a pooled ",
+              "ZEV share, or Washington's statewide regular gasoline price."
+            ),
+            p(
+              "ZEV includes battery electric, plug-in hybrid, and fuel-cell ",
+              "vehicles classified as new light-duty original titles."
+            )
+          ),
+          formula = tagList(
+            code("ZEV share_t = ZEV titles_t / all new LDV titles_t"),
+            tags$br(),
+            code("ZEV titles_t = BEV_t + PHEV_t + FCEV_t")
+          ),
+          variables = tagList(
+            p(strong("Numerator: "), "qualifying ZEV original titles."),
+            p(strong("Denominator: "), "all new light-duty original titles."),
+            p(
+              strong("Filters: "),
+              "selected geography, starting month, and vehicle-title rules."
+            )
+          ),
+          interpretation = p(
+            "A one-percentage-point change means one more ZEV title per 100 ",
+            "qualifying new light-duty titles. Counts can move with market ",
+            "volume even when the share is stable."
+          ),
+          caution = paste(
+            "Title processing month is not necessarily the dealer sale date.",
+            "Gasoline price is statewide even when a county is selected."
+          )
+        )
       ),
       tags$section(
         class = "panel",
@@ -358,7 +471,47 @@ ui <- fluidPage(
           plotlyOutput("benchmark_plot", height = "440px"),
           uiOutput("regression_evidence")
         ),
-        uiOutput("benchmark_explainer")
+        uiOutput("benchmark_explainer"),
+        calculation_note(
+          title = "Pre-rolloff forecast benchmark and interrupted time series",
+          measure = p(
+            "The gold line is the ZEV share expected from pre-rolloff history. ",
+            "The interrupted-time-series coefficients estimate level changes ",
+            "after the combined incentive rolloff and after March 2026."
+          ),
+          formula = tagList(
+            code(
+              "share_t = beta0 + beta1(time) + beta2(time^2) + month effects + COVID_t + error_t"
+            ),
+            tags$br(),
+            code("empirical band = expected_t ± 1.96 × rolling RMSE"),
+            tags$br(),
+            code("ITS adds rolloff_t and postwar_t level indicators")
+          ),
+          variables = tagList(
+            p(
+              strong("Outcome: "),
+              "monthly statewide ZEV title share."
+            ),
+            p(
+              strong("Baseline predictors: "),
+              "time, time squared, calendar month, and COVID disruption."
+            ),
+            p(
+              strong("Event terms: "),
+              "combined incentive rolloff and post-war period."
+            )
+          ),
+          interpretation = p(
+            "Observed minus expected shows departure from the historical path. ",
+            "An ITS coefficient is a percentage-point level shift after ",
+            "accounting for the modeled baseline."
+          ),
+          caution = paste(
+            "The shaded region is a forecast-error band, not a causal",
+            "confidence interval. The two incentive expirations overlap in time."
+          )
+        )
       ),
       tags$section(
         class = "panel",
@@ -376,6 +529,40 @@ ui <- fluidPage(
           class = "two-up",
           plotlyOutput("gas_sensitivity_plot", height = "390px"),
           uiOutput("gas_evidence")
+        ),
+        calculation_note(
+          title = "Lagged gasoline-price association across model specifications",
+          measure = p(
+            "Each point is the estimated change in ZEV title share associated ",
+            "with a $1-per-gallon increase in the average gasoline price during ",
+            "the prior three months."
+          ),
+          formula = tagList(
+            code("gas_prior_3m_t = mean(gas_{t-1}, gas_{t-2}, gas_{t-3})"),
+            tags$br(),
+            code(
+              "share_t = baseline controls + beta(gas_prior_3m_t) + error_t"
+            )
+          ),
+          variables = tagList(
+            p(
+              strong("Core controls: "),
+              "quadratic time trend, calendar month, COVID, and policy timing."
+            ),
+            p(
+              strong("Sensitivity controls: "),
+              "unemployment, residential electricity price, or post-war timing."
+            )
+          ),
+          interpretation = p(
+            "The point is the estimated percentage-point association per $1. ",
+            "The horizontal line is a Newey-West 95% interval. If it crosses ",
+            "zero, the estimate is not statistically distinct from zero."
+          ),
+          caution = paste(
+            "This is a predictive association. Fuel prices can move with other",
+            "economic conditions, and the estimate changes across specifications."
+          )
         )
       ),
       tags$section(
@@ -390,7 +577,34 @@ ui <- fluidPage(
             "control in the ZEV-title regression."
           )
         ),
-        plotlyOutput("vmt_plot", height = "410px")
+        plotlyOutput("vmt_plot", height = "410px"),
+        calculation_note(
+          title = "Year-over-year change in vehicle miles traveled",
+          measure = p(
+            "The bars compare total Washington vehicle miles traveled with the ",
+            "same calendar month one year earlier, which controls for recurring ",
+            "seasonal driving patterns."
+          ),
+          formula = code(
+            "VMT YoY_t = ((VMT_t / VMT_{t-12}) - 1) × 100"
+          ),
+          variables = tagList(
+            p(strong("VMT_t: "), "million vehicle miles in the current month."),
+            p(
+              strong("VMT_{t-12}: "),
+              "million vehicle miles in the same month one year earlier."
+            )
+          ),
+          interpretation = p(
+            "A negative value means less total driving than in the same month ",
+            "last year. This tests behavioral response, not vehicle choice."
+          ),
+          caution = paste(
+            "VMT is kept out of the ZEV-title model because it may occur after",
+            "a fuel-price shock and could mediate the relationship of interest.",
+            "May 2026 is preliminary."
+          )
+        )
       ),
       tags$section(
         class = "panel",
@@ -403,7 +617,35 @@ ui <- fluidPage(
             "November 2025–February 2026; largest county markets shown."
           )
         ),
-        plotlyOutput("county_plot", height = "470px")
+        plotlyOutput("county_plot", height = "470px"),
+        calculation_note(
+          title = "County-level change between pooled four-month periods",
+          measure = p(
+            "For each county, the chart compares the pooled March-June 2026 ",
+            "ZEV title share with the pooled November 2025-February 2026 share."
+          ),
+          formula = tagList(
+            code("period share_c = sum(ZEV titles_c) / sum(all new LDV titles_c)"),
+            tags$br(),
+            code("change_c = postwar share_c - prewar share_c")
+          ),
+          variables = tagList(
+            p(strong("c: "), "county."),
+            p(
+              strong("Pre-period: "),
+              "November 2025 through February 2026."
+            ),
+            p(strong("Post-period: "), "March through June 2026.")
+          ),
+          interpretation = p(
+            "Bars show percentage-point changes. Pooling title counts gives ",
+            "higher-volume months the appropriate weight within each county."
+          ),
+          caution = paste(
+            "County changes are descriptive and can be volatile in smaller",
+            "markets. Unknown or out-of-state geography is excluded."
+          )
+        )
       ),
       tags$section(
         class = "panel",
@@ -417,7 +659,36 @@ ui <- fluidPage(
             "directionally comparable but not identical measures."
           )
         ),
-        plotlyOutput("state_comparison_plot", height = "390px")
+        plotlyOutput("state_comparison_plot", height = "390px"),
+        calculation_note(
+          title = "Quarterly shares indexed to a common baseline",
+          measure = p(
+            "Each state's quarterly ZEV share is expressed relative to its own ",
+            "2025 Q4 value. Indexing makes direction and proportional movement ",
+            "comparable despite different starting shares."
+          ),
+          formula = tagList(
+            code("quarterly share_s,q = sum(ZEV) / sum(all eligible vehicles)"),
+            tags$br(),
+            code("index_s,q = 100 × share_s,q / share_s,2025Q4")
+          ),
+          variables = tagList(
+            p(strong("s: "), "state; q: quarter."),
+            p(
+              strong("Washington: "),
+              "new light-duty original-title share."
+            ),
+            p(strong("California: "), "CEC-inferred new-vehicle sales share.")
+          ),
+          interpretation = p(
+            "An index of 110 means the state's share is 10% above its own 2025 ",
+            "Q4 level. It does not mean ZEV share is 110%."
+          ),
+          caution = paste(
+            "The states use related but non-identical measures. Compare movement",
+            "and timing, not absolute share levels."
+          )
+        )
       ),
       tags$section(
         class = "panel",
@@ -434,6 +705,94 @@ ui <- fluidPage(
           class = "two-up",
           plotlyOutput("conjoint_plot", height = "510px"),
           uiOutput("conjoint_evidence")
+        ),
+        calculation_note(
+          title = "Effect-coded part-worth utilities from profile ratings",
+          measure = p(
+            "Part-worths estimate how each attribute level changes stated ",
+            "preference after accounting for each respondent's general rating ",
+            "tendency."
+          ),
+          formula = tagList(
+            code("preference = 6 - original rating"),
+            tags$br(),
+            code(
+              "preference = respondent effects + brand + fuel economy + price + error"
+            )
+          ),
+          variables = tagList(
+            p(
+              strong("Attributes: "),
+              "brand, fuel economy, and purchase price."
+            ),
+            p(
+              strong("Adjustment: "),
+              "respondent fixed effects, effect coding, and respondent-clustered ",
+              "standard errors."
+            )
+          ),
+          interpretation = p(
+            "Positive utility means greater stated preference relative to the ",
+            "attribute's average level. The horizontal interval shows estimation ",
+            "uncertainty. Utilities are comparable within, not across, attributes."
+          ),
+          caution = paste(
+            "The sample is small. Brand and fuel economy are confounded because",
+            "Tesla was consistently paired with 110 MPGe, so price is the clearest",
+            "attribute result."
+          )
+        )
+      ),
+      tags$section(
+        class = "methods-reference",
+        div(class = "section-kicker", "Methods reference"),
+        h2("How to read the evidence"),
+        p(
+          class = "methods-intro",
+          paste(
+            "The calculation panels separate what is directly observed from",
+            "what is modeled. Use the strength of the design, not visual size",
+            "alone, when interpreting a chart."
+          )
+        ),
+        div(
+          class = "methods-grid",
+          div(
+            class = "method-card",
+            span(class = "method-tag", "Observed"),
+            h3("Counts, shares, and changes"),
+            p(
+              paste(
+                "Sections 01, 04, 05, and 06 summarize recorded titles, driving,",
+                "or comparison data. They describe what happened without assigning",
+                "a cause."
+              )
+            )
+          ),
+          div(
+            class = "method-card",
+            span(class = "method-tag", "Modeled"),
+            h3("Expected path and event shifts"),
+            p(
+              paste(
+                "Section 02 compares observed share with a rolling-validated",
+                "pre-event forecast and estimates level shifts with an",
+                "interrupted time series."
+              )
+            )
+          ),
+          div(
+            class = "method-card",
+            span(class = "method-tag", "Estimated association"),
+            h3("Fuel price and stated preference"),
+            p(
+              paste(
+                "Sections 03 and 07 report coefficients with uncertainty.",
+                "Intervals and specification sensitivity matter as much as the",
+                "point estimate."
+              )
+            )
+          )
         )
       ),
       div(
