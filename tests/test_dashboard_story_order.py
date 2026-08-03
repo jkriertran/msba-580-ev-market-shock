@@ -27,6 +27,20 @@ class DashboardStoryOrderTest(unittest.TestCase):
             ],
         )
 
+    def test_explanatory_copy_uses_reordered_section_numbers(self):
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        expected_references = [
+            "Sections 01, 02, 03, and 06 summarize recorded titles, driving,",
+            "Section 04 compares observed share with a rolling-validated",
+            "Sections 05 and 07 report coefficients with uncertainty.",
+            "separately in Section 05. The benchmark does not prove that the",
+        ]
+
+        for reference in expected_references:
+            with self.subTest(reference=reference):
+                self.assertIn(reference, app_source)
+
 
 if __name__ == "__main__":
     unittest.main()
