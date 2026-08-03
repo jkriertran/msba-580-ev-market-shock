@@ -941,7 +941,7 @@ ui <- fluidPage(
             h3("Counts, shares, and changes"),
             p(
               paste(
-                "Sections 01, 04, 05, and 06 summarize recorded titles, driving,",
+              "Sections 01, 02, 03, and 06 summarize recorded titles, driving,",
                 "or comparison data. They describe what happened without assigning",
                 "a cause."
               )
@@ -953,7 +953,7 @@ ui <- fluidPage(
             h3("Expected path and event shifts"),
             p(
               paste(
-                "Section 02 compares observed share with a rolling-validated",
+              "Section 04 compares observed share with a rolling-validated",
                 "pre-event forecast and estimates level shifts with an",
                 "interrupted time series."
               )
@@ -965,7 +965,7 @@ ui <- fluidPage(
             h3("Fuel price and stated preference"),
             p(
               paste(
-                "Sections 03 and 07 report coefficients with uncertainty.",
+              "Sections 05 and 07 report coefficients with uncertainty.",
                 "Intervals and specification sensitivity matter as much as the",
                 "point estimate."
               )
@@ -1272,7 +1272,7 @@ server <- function(input, output, session) {
         strong("Important distinction: "),
         paste(
           "gasoline price is not a predictor in this benchmark; it is modeled",
-          "separately in Section 03. The benchmark does not prove that the",
+            "separately in Section 05. The benchmark does not prove that the",
           "state or federal incentive expirations, or the war, caused the change."
         )
       )
