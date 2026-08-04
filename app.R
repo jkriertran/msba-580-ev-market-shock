@@ -93,6 +93,28 @@ audit_value <- function(metric_name) {
     pull(value)
 }
 
+conjoint_audit_value <- function(metric_name) {
+  conjoint_audit |>
+    filter(metric == metric_name) |>
+    pull(value)
+}
+
+downloadable_data_files <- file.path(
+  "data",
+  c(
+    "data_dictionary.csv",
+    "washington_titles_monthly.csv",
+    "washington_county_monthly.csv",
+    "washington_gas_monthly.csv",
+    "washington_unemployment_monthly.csv",
+    "washington_electricity_monthly.csv",
+    "washington_policy_monthly.csv",
+    "washington_vmt_monthly.csv",
+    "quarterly_controls.csv",
+    "conjoint_survey.csv"
+  )
+)
+
 event_markers <- tibble::tribble(
   ~date, ~event,
   as.Date("2025-07-31"), "WA sales-tax exemption ends",
@@ -394,9 +416,20 @@ h1 { font-family:'DM Serif Display'; font-size:clamp(42px,5vw,74px); line-height
 .method-card h3 { margin:0 0 8px; font-family:'DM Serif Display'; font-size:19px; }
 .method-card p { margin:0; color:var(--muted); font-size:12px; line-height:1.58; }
 .method-tag { display:block; margin-bottom:8px; color:var(--rust); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+.reference-subhead { margin:24px 0 10px; font-family:'DM Serif Display'; font-size:21px; }
+.reference-table-wrap { overflow-x:auto; border:1px solid var(--ink); background:#fffdf8; }
+.reference-table,.data-sample-table table { width:100%; margin:0; border-collapse:collapse; background:#fffdf8; }
+.reference-table th,.reference-table td,.data-sample-table th,.data-sample-table td { padding:13px 14px; border:0; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; font-size:11px; line-height:1.48; }
+.reference-table th,.data-sample-table th { color:var(--rust); font-size:9px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; }
+.reference-table tr:last-child td,.data-sample-table tr:last-child td { border-bottom:0; }
+.reference-table td:first-child { min-width:155px; color:var(--ink); font-weight:600; }
+.data-download-panel { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:22px; align-items:center; margin-top:15px; padding:17px 18px; border:1px solid var(--ink); background:var(--deep); }
+.data-download-copy { margin:0; color:var(--muted); font-size:12px; line-height:1.55; }
+.data-download { border:1px solid var(--ink); border-radius:0; background:var(--teal); color:#fffdf8; font-size:11px; font-weight:600; white-space:nowrap; }
+.data-download:hover,.data-download:focus { border-color:var(--ink); background:#0f5653; color:#fff; }
 @media(max-width:1100px){.explainer-grid{grid-template-columns:repeat(2,1fr)}.explainer-cell:nth-child(3){border-left:0;border-top:1px solid var(--line)}.explainer-cell:nth-child(4){border-top:1px solid var(--line)}.methods-grid{grid-template-columns:1fr}.method-card+.method-card{border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:920px){.app-grid,.two-up,.scenario-layout{grid-template-columns:1fr}.controls{border-right:0;border-bottom:1px solid var(--line);padding:24px 5vw}.controls-inner{position:static}.content{padding:28px 5vw}.scenario-controls{border-right:0;border-bottom:1px solid var(--line)}}
-@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid,.calculation-body,.scenario-metrics,.scenario-lab-header{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4),.calculation-cell:nth-child(even),.scenario-metric+.scenario-metric{border-left:0}.calculation-cell+.calculation-cell,.scenario-metric+.scenario-metric{border-top:1px solid var(--line)}.calculation-note summary{grid-template-columns:1fr auto}.calculation-label{grid-column:1/-1}.calculation-title{font-size:16px}.scenario-badge{justify-self:start}}
+@media(max-width:620px){.signal-strip,.explainer-lead,.explainer-grid,.calculation-body,.scenario-metrics,.scenario-lab-header,.data-download-panel{grid-template-columns:1fr}.signal+.signal,.explainer-cell+.explainer-cell,.explainer-cell:nth-child(3),.explainer-cell:nth-child(4),.calculation-cell:nth-child(even),.scenario-metric+.scenario-metric{border-left:0}.calculation-cell+.calculation-cell,.scenario-metric+.scenario-metric{border-top:1px solid var(--line)}.calculation-note summary{grid-template-columns:1fr auto}.calculation-label{grid-column:1/-1}.calculation-title{font-size:16px}.scenario-badge{justify-self:start}.data-download{justify-self:start;white-space:normal}}
 "
 
 ui <- fluidPage(
@@ -922,6 +955,39 @@ ui <- fluidPage(
         )
       ),
       tags$section(
+        class = "methods-reference data-reference",
+        div(class = "section-kicker", "Data and sample"),
+        h2("What evidence is in the project?"),
+        p(
+          class = "methods-intro",
+          paste(
+            "The market analysis aggregates transaction-level title records to",
+            "months, while the conjoint model uses respondent-profile ratings.",
+            "The table distinguishes underlying records from the observations",
+            "that enter each analysis."
+          )
+        ),
+        div(
+          class = "data-sample-table reference-table-wrap",
+          tableOutput("data_sample_table")
+        ),
+        div(
+          class = "data-download-panel",
+          p(
+            class = "data-download-copy",
+            paste(
+              "Download the analysis-ready CSV inputs and data dictionary.",
+              "The survey file contains anonymous respondent IDs only."
+            )
+          ),
+          downloadButton(
+            "download_data_bundle",
+            "Download analysis datasets (.zip)",
+            class = "data-download"
+          )
+        )
+      ),
+      tags$section(
         class = "methods-reference",
         div(class = "section-kicker", "Methods reference"),
         h2("How to read the evidence"),
@@ -971,6 +1037,53 @@ ui <- fluidPage(
               )
             )
           )
+        ),
+        h3(class = "reference-subhead", "Method strengths and limitations"),
+        div(
+          class = "reference-table-wrap",
+          tags$table(
+            class = "reference-table",
+            tags$thead(
+              tags$tr(
+                tags$th("Method"),
+                tags$th("Role in this project"),
+                tags$th("Strength"),
+                tags$th("Limitation")
+              )
+            ),
+            tags$tbody(
+              tags$tr(
+                tags$td("Descriptive comparisons"),
+                tags$td("Summarize title share, VMT, county, and California patterns."),
+                tags$td("Transparent measures show the observed magnitude and timing."),
+                tags$td("They do not control for competing explanations or identify causes.")
+              ),
+              tags$tr(
+                tags$td("Multiple regression benchmark"),
+                tags$td("Estimate the pre-rolloff path using trend, seasonality, and COVID."),
+                tags$td("Rolling one-month forecasts compare candidate specifications out of sample."),
+                tags$td("Forecasts assume the historical structure remains informative after the shock.")
+              ),
+              tags$tr(
+                tags$td("Interrupted time series"),
+                tags$td("Estimate adjusted level differences after the incentive rolloff and war."),
+                tags$td("Uses the full monthly history and autocorrelation-robust uncertainty."),
+                tags$td("Only four post-war months and overlapping events prevent causal attribution.")
+              ),
+              tags$tr(
+                tags$td("Gas-price regression"),
+                tags$td("Test whether prior-three-month gasoline prices add predictive signal."),
+                tags$td("Lag comparison, rolling validation, and sensitivity models test robustness."),
+                tags$td("The estimate is observational and weakens after adding electricity prices.")
+              ),
+              tags$tr(
+                tags$td("Rating-based conjoint analysis"),
+                tags$td("Estimate stated preference for price, brand, and fuel economy."),
+                tags$td("Respondent effects isolate within-person tradeoffs across rated profiles."),
+                tags$td("The sample has 18 respondents, and brand is confounded with fuel economy.")
+              )
+            )
+          )
         )
       ),
       div(
@@ -987,6 +1100,85 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  output$data_sample_table <- renderTable(
+    {
+      data.frame(
+        Dataset = c(
+          "Washington title market",
+          "Washington county title panel",
+          "Gas and economic controls",
+          "Washington driving",
+          "California comparison",
+          "Class conjoint survey"
+        ),
+        Source = c(
+          "Washington Department of Licensing",
+          "Washington Department of Licensing",
+          "EIA and BLS",
+          "Federal Highway Administration",
+          "California Energy Commission",
+          "Anonymous MSBA 580 class survey"
+        ),
+        `Analysis unit` = c(
+          "Monthly statewide ZEV-title share",
+          "County-month ZEV-title share",
+          "Monthly statewide control series",
+          "Monthly statewide vehicle miles traveled",
+          "Quarterly inferred ZEV-sales share",
+          "Respondent-profile rating"
+        ),
+        Coverage = c(
+          "January 2017 to June 2026",
+          "January 2017 to June 2026",
+          "January 2017 to July 2026",
+          "January 2023 to May 2026",
+          "2023 Q1 to 2026 Q2",
+          "Final class survey"
+        ),
+        `Sample size` = c(
+          "114 months; 2,541,732 titles (270,363 ZEV)",
+          "4,558 county-month rows; 39 named counties",
+          "114 aligned months; 115 gas, 114 unemployment, and 113 electricity rows",
+          "41 months",
+          "14 quarters",
+          "18 respondents; 123 usable ratings; 17 unique profiles"
+        ),
+        check.names = FALSE
+      )
+    },
+    striped = TRUE,
+    bordered = FALSE,
+    hover = TRUE,
+    spacing = "s",
+    rownames = FALSE
+  )
+
+  output$download_data_bundle <- downloadHandler(
+    filename = function() {
+      "washington-ev-analysis-datasets.zip"
+    },
+    content = function(file) {
+      missing_files <- downloadable_data_files[
+        !file.exists(downloadable_data_files)
+      ]
+      if (length(missing_files) > 0) {
+        stop(
+          "Dataset bundle is missing: ",
+          paste(basename(missing_files), collapse = ", ")
+        )
+      }
+
+      original_directory <- getwd()
+      on.exit(setwd(original_directory), add = TRUE)
+      setwd("data")
+      utils::zip(
+        zipfile = file,
+        files = basename(downloadable_data_files)
+      )
+    },
+    contentType = "application/zip"
+  )
+
   selected_series <- reactive({
     if (input$county == "Washington statewide") {
       wa_monthly
