@@ -23,4 +23,33 @@ california_vmt_monthly.csv,yoy_change,Change from the same calendar month one ye
 california_vmt_monthly.csv,estimate_status,Whether the observation is preliminary or revised,category
 california_vmt_monthly.csv,release_month,FHWA report month supplying the observation,date
 california_vmt_monthly.csv,road_coverage,Road network included in the estimate,text
+conjoint_survey.csv,SurveyID,Anonymous respondent identifier,integer
+conjoint_survey.csv,orderShown,Profile display position within respondent,integer
+conjoint_survey.csv,Brand,Vehicle brand shown in the profile,category
+conjoint_survey.csv,MPG,Fuel-economy level shown in the profile,category
+conjoint_survey.csv,Price,Purchase-price level shown in the profile,dollars
+conjoint_survey.csv,Rating,Profile rating where 1 is best and 5 is worst,ordinal score
 california_vmt_monthly.csv,source_url,FHWA report URL used for the observation,URL
+washington_titles_monthly.csv,month,Month in which Washington DOL recorded the title transaction,date
+washington_titles_monthly.csv,total_new_ldv_titles,All new light-duty original-title transactions,titles
+washington_titles_monthly.csv,bev_titles,New light-duty battery-electric original titles,titles
+washington_titles_monthly.csv,phev_titles,New light-duty plug-in-hybrid original titles,titles
+washington_titles_monthly.csv,fcev_titles,New light-duty hydrogen fuel-cell original titles,titles
+washington_titles_monthly.csv,zev_titles,BEV plus PHEV plus FCEV original titles,titles
+washington_titles_monthly.csv,zev_share,ZEV titles divided by all new light-duty original titles,proportion
+washington_county_monthly.csv,county,Washington owner county reported by DOL,text
+washington_gas_monthly.csv,month,Month of EIA Washington gasoline-price observations,date
+washington_gas_monthly.csv,washington_regular_gas_price,Average weekly Washington regular gasoline price within month,dollars per gallon
+washington_unemployment_monthly.csv,month,Month of the Washington labor-force estimate,date
+washington_unemployment_monthly.csv,washington_unemployment_rate,Seasonally adjusted Washington unemployment rate,percent
+washington_unemployment_monthly.csv,estimate_status,BLS publication status including the unavailable October 2025 observation,category
+washington_electricity_monthly.csv,month,Month of EIA Washington residential electricity observations,date
+washington_electricity_monthly.csv,washington_residential_electricity_cents_kwh,Average Washington residential retail electricity price,cents per kilowatt-hour
+washington_policy_monthly.csv,wa_sales_tax_exemption_active,Indicator for Washington clean-vehicle sales-tax exemption availability,binary
+washington_policy_monthly.csv,wa_instant_rebate_active,Proxy indicator for the funded Washington EV Instant Rebate period,binary
+washington_policy_monthly.csv,combined_incentive_transition,July through October 2025 incentive transition and title-processing period,binary
+washington_policy_monthly.csv,post_combined_incentive_rolloff,November 2025 onward after state and federal incentive rolloffs,binary
+washington_vmt_monthly.csv,month,Month represented by the Washington VMT estimate,date
+washington_vmt_monthly.csv,vmt_million_miles,Estimated Washington travel on all roads and streets,million vehicle-miles
+washington_vmt_monthly.csv,yoy_change,Change from the same calendar month one year earlier,proportion
+washington_vmt_monthly.csv,estimate_status,Whether the FHWA estimate is preliminary or revised,category

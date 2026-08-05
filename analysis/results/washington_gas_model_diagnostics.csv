@@ -1,0 +1,15 @@
+metric,value
+outcome,Monthly new light-duty ZEV original-title share
+gas_exposure,Average Washington regular gasoline price in prior three months
+training_window,2017-01 through 2025-06 for rolling comparison
+rolling_validation_months,42
+no_gas_rolling_rmse,0.03658749113128
+prior_3m_gas_rolling_rmse,0.0336833988821087
+rolling_rmse_improvement,0.0793739105737294
+gas_coefficient_share_per_dollar,0.0277014036070378
+gas_coefficient_percentage_points_per_dollar,2.77014036070378
+gas_newey_west_p_value,0.0305040014152204
+gas_confidence_low_percentage_points,0.266438914674188
+gas_confidence_high_percentage_points,5.27384180673338
+association_model_observations,111
+unemployment_interpolated_months,1

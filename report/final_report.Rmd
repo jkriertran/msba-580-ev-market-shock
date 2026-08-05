@@ -1,0 +1,601 @@
+---
+title: "Washington ZEV Demand After Two Market Shocks"
+subtitle: "Monthly title transactions, fuel pressure, and stated preferences"
+author: "MSBA 580 Project Group"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+report_path <- normalizePath(knitr::current_input(dir = TRUE), mustWork = TRUE)
+project_root <- normalizePath(file.path(dirname(report_path), ".."), mustWork = TRUE)
+for (script_name in c("run_washington_analysis.R", "run_conjoint_analysis.R")) {
+  status <- system2(
+    file.path(R.home("bin"), "Rscript"),
+    file.path(project_root, "scripts", script_name)
+  )
+  if (status != 0L) stop(script_name, " did not complete.")
+}
+
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE,
+  fig.width = 9, fig.height = 5, dpi = 120
+)
+library(ggplot2)
+library(scales)
+
+read_result <- function(file_name) {
+  read.csv(
+    file.path(project_root, "analysis", "results", file_name),
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+}
+monthly <- read_result("washington_monthly_analysis.csv")
+monthly$month <- as.Date(monthly$month)
+events <- read_result("washington_event_summary.csv")
+its <- read_result("washington_its_coefficients.csv")
+county <- read_result("washington_county_postwar.csv")
+models <- read_result("washington_model_comparison.csv")
+gas_models <- read_result("washington_gas_model_comparison.csv")
+gas_coefficients <- read_result("washington_gas_model_coefficients.csv")
+gas_sensitivity <- read_result("washington_gas_model_sensitivity.csv")
+conjoint <- read_result("conjoint_partworths.csv")
+conjoint_tests <- read_result("conjoint_attribute_tests.csv")
+conjoint_pairwise <- read_result("conjoint_pairwise_contrasts.csv")
+conjoint_audit <- read_result("conjoint_data_audit.csv")
+data_audit <- read_result("washington_data_audit.csv")
+vmt <- read.csv(
+  file.path(project_root, "data", "washington_vmt_monthly.csv"),
+  stringsAsFactors = FALSE
+)
+vmt$month <- as.Date(vmt$month)
+
+postwar <- events[events$period == "Post-war", ]
+prewar <- events[
+  events$period == "Post-incentive-rolloff / pre-war",
+]
+war_effect <- its[its$term == "post_war", ]
+rolloff_effect <- its[
+  its$term == "post_combined_incentive_rolloff",
+]
+gas_effect <- gas_coefficients[
+  gas_coefficients$term == "gas_price_prior_3m",
+]
+
+paper <- "#f6f1e7"; ink <- "#27241f"; teal <- "#176b68"
+rust <- "#b9472e"; gold <- "#8b6b2f"
+report_theme <- theme_minimal(base_size = 12) +
+  theme(
+    plot.background = element_rect(fill = paper, color = NA),
+    panel.background = element_rect(fill = paper, color = NA),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text = element_text(color = ink),
+    axis.title = element_text(color = ink, face = "bold"),
+    plot.title = element_text(face = "bold", color = ink),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
+```
+
+# Executive report
+
+## Decision question
+
+Washington vehicle manufacturers, dealers, and policy analysts need to know
+whether the early-2026 gasoline-price shock produced a meaningful ZEV-demand
+rebound after Washington and federal incentives rolled off in 2025. We ask:
+**Did Washington's share of new light-duty ZEV title transactions rise after
+the war, and was that movement distinguishable from the post-incentive-rolloff
+market?**
+
+The answer is cautious. Washington's pooled ZEV-title share increased from
+13.9% in November 2025–February 2026 to 14.5% in March–June 2026, a 0.56-point
+increase, while average regular gasoline prices rose 33.8%. An interrupted
+time-series model estimates an additional post-war change of 1.15 percentage
+points, but it is not statistically distinct from zero (Newey–West p = 0.285).
+The evidence does not yet show that fuel pressure restored the demand lost
+after incentives rolled off. Lagged gasoline prices add modest predictive
+information, but the result is sensitive to the electricity-price control.
+
+## Data and definitions
+
+The primary source is the Washington Department of Licensing's public
+[Vehicle Title Transactions](https://data.wa.gov/Transportation/Vehicle-Title-Transactions-by-Department-of-Licens/cdk6-5kdf)
+API. The pipeline uses 114 consecutive months from January 2017 through June
+2026. It requires original titles, the DOL new-vehicle flag, Washington owner
+state, passenger cars/multipurpose vehicles/light trucks, and light-duty weight
+classes. ZEVs include BEVs, PHEVs, and hydrogen fuel-cell vehicles.
+
+This measure is a registration transaction, not a dealer sale date. Title
+processing can lag purchase timing, so October 2025 remains in the
+incentive-transition/processing period and the modeled post-rolloff period
+begins in November. Washington's clean-vehicle sales-tax exemption ended July
+31, 2025, shortly before the federal credit ended September 30, so their
+effects cannot be separated reliably. Washington gasoline prices come from the
+[U.S. Energy Information Administration](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=EMM_EPMR_PTE_SWA_DPG).
+California Energy Commission quarterly sales are retained only as a neighboring
+comparison because their timing and construction differ.
+
+### Data sources, units, and sample sizes
+
+| Dataset | Source | Analysis unit | Coverage | Sample size |
+|---|---|---|---|---|
+| Washington title market | Washington Department of Licensing | Monthly statewide ZEV-title share | January 2017–June 2026 | 114 months from 2,541,732 titles, including 270,363 ZEV titles |
+| Washington county title panel | Washington Department of Licensing | County-month ZEV-title share | January 2017–June 2026 | 4,558 county-month rows and 39 named counties |
+| Gas and economic controls | EIA and BLS | Monthly statewide series | January 2017–July 2026 | 115 gas-price, 114 unemployment, and 113 electricity-price rows |
+| Washington driving | Federal Highway Administration | Monthly statewide vehicle miles traveled | January 2023–May 2026 | 41 months |
+| California comparison | California Energy Commission | Quarterly inferred ZEV-sales share | 2023 Q1–2026 Q2 | 14 quarters |
+| Class conjoint survey | Anonymous MSBA 580 class survey | Respondent-profile rating | Final class survey | 18 respondents, 123 usable ratings, and 17 unique profiles |
+
+The regression sample size is 114 monthly observations, not 2.54 million
+independent observations. The larger number describes the title transactions
+aggregated into those monthly shares. The Shiny app provides a downloadable ZIP
+containing the analysis-ready CSV inputs and data dictionary.
+
+## Analytical methods
+
+The first technique is a pre-event regression benchmark trained through June
+2025. We compare seasonal-only, linear-time, and quadratic-time models, each
+including calendar-month effects and a COVID disruption indicator. Rolling
+one-month-ahead validation covers 42 months. The quadratic specification has
+the lowest RMSE, 3.66 percentage points, narrowly outperforming the linear
+model's 3.78 points.
+
+The second specification is an interrupted time series using all 114 months.
+It adds combined post-incentive-rolloff and post-war level indicators to the
+quadratic trend, seasonality, and COVID control. Newey–West standard errors
+address residual autocorrelation. Event coefficients describe deviations
+associated with each period; they do not identify causal effects.
+
+The third specification tests gasoline-price association. Current and lagged
+gasoline measures are compared using the same rolling window. The
+prior-three-month average performs best and is then fit with trend, seasonality,
+COVID, Washington incentive timing, and the combined rolloff period.
+Washington unemployment, electricity prices, and a post-war indicator are
+added separately as sensitivity checks.
+
+Monthly Washington titles materially improve the study design over the earlier
+California-only quarterly approach. They provide enough pre-event history to
+estimate recurring seasonal patterns, reserve 42 months for rolling forecast
+validation, and distinguish the credit transition from the later war period.
+The county panel then tests whether the statewide change was geographically
+broad or driven by one large market. California is not pooled into the
+regression: it serves only as a directional comparison because California
+reports inferred sales while Washington reports title transactions.
+
+### Method strengths and limitations
+
+| Method | Role in this project | Strength | Limitation |
+|---|---|---|---|
+| Descriptive comparisons | Summarize title share, VMT, county, and California patterns | Transparent measures show observed magnitude and timing | No controls for competing explanations and no causal identification |
+| Multiple regression benchmark | Estimate the pre-rolloff path using trend, seasonality, and COVID | Candidate models are compared with 42 rolling one-month forecasts | Historical structure may not remain informative after a market shock |
+| Interrupted time series | Estimate adjusted level differences after the incentive rolloff and war | Uses the full monthly history and Newey–West uncertainty | Only four post-war months and overlapping events prevent causal attribution |
+| Gas-price regression | Test whether prior-three-month gasoline prices add predictive signal | Lag comparisons, rolling validation, and sensitivity specifications test robustness | Observational estimate weakens after adding electricity prices |
+| Rating-based conjoint analysis | Estimate stated preference for price, brand, and fuel economy | Respondent effects isolate within-person tradeoffs across profiles | Only 18 respondents; brand and fuel economy are partially confounded |
+
+Multiple regression and conjoint analysis are the two primary course methods.
+The interrupted-time-series and gas-price specifications are extensions of the
+multiple-regression method rather than separate course techniques.
+
+```{r benchmark, fig.cap="Observed Washington ZEV-title share and the pre-rolloff benchmark."}
+display <- monthly[monthly$month >= as.Date("2021-01-01"), ]
+ggplot(display, aes(month)) +
+  geom_ribbon(
+    aes(ymin = empirical_prediction_low, ymax = empirical_prediction_high),
+    fill = teal, alpha = .12
+  ) +
+  geom_line(aes(y = expected_zev_share, color = "Expected"), linewidth = .9) +
+  geom_line(aes(y = zev_share, color = "Observed"), linewidth = 1.05) +
+  geom_vline(xintercept = as.Date("2025-11-01"), color = rust, linetype = "dashed") +
+  geom_vline(xintercept = as.Date("2026-03-01"), color = rust, linetype = "dotted") +
+  scale_color_manual(values = c("Expected" = gold, "Observed" = teal)) +
+  scale_y_continuous(labels = label_percent(accuracy = 1)) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%Y\n%b") +
+  labs(
+    title = "ZEV title share remained below its pre-rolloff trajectory",
+    x = NULL, y = "New light-duty ZEV title share"
+  ) +
+  report_theme
+```
+
+## Findings
+
+The benchmark expected a pooled 25.7% ZEV-title share during March–June 2026,
+11.2 points above the observed 14.5%. The interrupted model estimates a
+combined post-incentive-rolloff level shift of −11.59 points (p < 0.001). Its
+additional post-war coefficient is positive but uncertain: +1.15 points with a
+95% interval from −0.97 to +3.28 points.
+
+Gasoline prices averaged \$3.90 per gallon in the four post-rolloff/pre-war
+months and \$5.22 during the four post-war months. Thus, higher fuel costs
+coincided with only a small title-share increase. This is inconsistent with a
+large immediate fuel-price-driven recovery, although purchasing and title
+processing may respond with longer lags.
+
+The prior-three-month gas measure reduces rolling RMSE from 3.66 to 3.37
+percentage points, a 7.9% improvement. The policy-adjusted estimate is +2.77
+ZEV-share percentage points per \$1/gallon (95% CI +0.27 to +5.27; p = 0.031).
+After adding Washington electricity prices, the estimate is +2.00 points and
+its interval includes zero (p = 0.118). The result is therefore a modest,
+specification-sensitive predictive association, not a causal effect.
+
+FHWA VMT was 1.0% below the same month one year earlier in preliminary May 2026
+data. VMT is treated as a separate behavioral outcome rather than a ZEV-share
+control because driving can itself respond to gasoline prices.
+
+County patterns were more favorable but heterogeneous. Thirty-two of 39
+counties increased ZEV-title share, and the median change was +3.34 points.
+Among large markets, Pierce gained 4.70 points, Snohomish 4.51, and Clark 6.90,
+while King declined 3.18. County results exclude the DOL's “Unknown or Out of
+State” category and should not be treated as independent statewide experiments.
+
+```{r county, fig.cap="Change in ZEV-title share for the 15 largest county markets."}
+county_display <- head(county[order(-county$postwar_new_ldv_titles), ], 15)
+county_display$county <- reorder(
+  county_display$county,
+  county_display$change_percentage_points
+)
+ggplot(county_display, aes(change_percentage_points, county)) +
+  geom_vline(xintercept = 0, color = "#746e64") +
+  geom_col(aes(fill = change_percentage_points >= 0), show.legend = FALSE) +
+  scale_fill_manual(values = c("TRUE" = teal, "FALSE" = rust)) +
+  labs(
+    title = "Most large counties improved, but King County did not",
+    x = "Post-war change (percentage points)", y = NULL
+  ) +
+  report_theme
+```
+
+The rating-based conjoint survey adds stated-preference evidence from 123
+ratings supplied by 18 respondents. Price is the clearest attribute
+(cluster-robust p = 0.013): a \$30,000 profile scores 1.30 preference points
+above a \$120,000 profile (p = 0.005). Brand and fuel economy cannot be cleanly
+separated because Tesla was consistently paired with 110 MPGe.
+
+## Recommendations and limitations
+
+Managers should avoid a broad Washington inventory expansion based on four
+post-war months. Prioritize affordability and total-cost messaging, then monitor
+whether title share continues improving as gasoline prices remain elevated.
+County-level campaigns are more defensible in markets showing both scale and
+positive movement, such as Pierce, Snohomish, and Clark.
+
+The study is observational. Washington and federal policy, manufacturer
+incentives, interest rates, vehicle prices, model availability, title-processing
+delays, and the war overlap. The state and federal incentive expirations are
+especially difficult to separate. The post-war period is short, the
+gas-association estimate weakens with electricity prices, rolling forecast
+error is material, and the conjoint sample is small and partially confounded.
+Later DOL releases are needed before claiming a durable rebound.
+
+## Sources
+
+- [Washington Department of Licensing title transactions](https://data.wa.gov/Transportation/Vehicle-Title-Transactions-by-Department-of-Licens/cdk6-5kdf)
+- [EIA Washington regular gasoline prices](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=EMM_EPMR_PTE_SWA_DPG)
+- [BLS Washington unemployment](https://data.bls.gov/timeseries/LAUST530000000000003)
+- [FHWA Traffic Volume Trends](https://www.fhwa.dot.gov/policyinformation/travel_monitoring/tvt.cfm)
+- [Washington clean-vehicle sales-tax exemption](https://dor.wa.gov/forms-publications/publications-subject/special-notices/new-clean-alternative-fuel-and-plug-hybrid-vehicle-sales-and-use-tax-exemption)
+- [Washington EV Instant Rebate](https://www.commerce.wa.gov/clean-transportation/ev-instant-rebate/)
+- [California Energy Commission ZEV sales](https://www.energy.ca.gov/data-reports/energy-almanac/zero-emission-vehicle-and-infrastructure-statistics-collection/new-zev)
+
+# Technical calculation appendix
+
+This appendix shows how each result is calculated and how each variable enters
+the analysis. It is supplemental to the executive report. All outcome shares
+are stored as proportions in the model, then multiplied by 100 when reported
+as percentage points.
+
+## Calculation map
+
+| Study | Outcome being explained | Main inputs | What the result means |
+|---|---|---|---|
+| Descriptive event comparison | Pooled Washington ZEV-title share | ZEV titles, all new light-duty titles, event window | Observed before-versus-after difference; no controls |
+| Pre-rolloff benchmark | Monthly Washington ZEV-title share | Time, time squared, calendar month, COVID period | Expected share if the pre-rolloff pattern continued |
+| Interrupted time series | Monthly Washington ZEV-title share | Benchmark variables, combined incentive rolloff, post-event indicator | Adjusted level differences associated with the two periods |
+| Gas-price model | Monthly Washington ZEV-title share | Prior-three-month gas price and policy, trend, seasonal, and COVID controls | Predictive association per \$1 per gallon |
+| VMT response | Year-over-year Washington vehicle miles traveled | Current-month and prior-year VMT | Separate driving response, not a ZEV-share control |
+| County comparison | Pooled county ZEV-title share | County titles in the two four-month windows | Geographic heterogeneity in percentage points |
+| California comparison | Indexed quarterly ZEV share | Washington titles and California inferred sales | Directional comparison from a common baseline |
+| Conjoint survey | Reversed profile rating | Price, brand, fuel economy, respondent | Stated preference associated with each attribute level |
+
+## 1. Primary ZEV-title share
+
+For month $t$, the primary outcome is:
+
+$$
+ZEVShare_t =
+\frac{BEV_t + PHEV_t + FCEV_t}
+{All\ new\ light\text{-}duty\ original\ titles_t}.
+$$
+
+The numerator and denominator use the same filters: original title, DOL `New`
+flag, Washington owner state, eligible passenger/light-truck vehicle types,
+and light-duty weight classes. This makes powertrain classification the only
+difference between the numerator and denominator.
+
+Across the complete study period, the pipeline contains
+`r format(as.numeric(data_audit$value[data_audit$metric == "total_new_ldv_titles"]), big.mark = ",")`
+new light-duty titles and
+`r format(as.numeric(data_audit$value[data_audit$metric == "total_zev_titles"]), big.mark = ",")`
+ZEV titles over
+`r data_audit$value[data_audit$metric == "consecutive_months"]` consecutive
+months.
+
+## 2. Descriptive event-window calculation
+
+The pooled share gives months with more title transactions proportionally more
+weight:
+
+$$
+PooledShare_w = \frac{\sum_{t \in w} ZEVTitles_t}
+{\sum_{t \in w} NewLDVTitles_t}.
+$$
+
+```{r event-window-calculation}
+event_calculation <- data.frame(
+  Window = c("November 2025-February 2026", "March-June 2026"),
+  `ZEV titles` = c(prewar$zev_titles, postwar$zev_titles),
+  `All new LDV titles` = c(prewar$new_ldv_titles, postwar$new_ldv_titles),
+  Calculation = c(
+    paste0(prewar$zev_titles, " / ", prewar$new_ldv_titles),
+    paste0(postwar$zev_titles, " / ", postwar$new_ldv_titles)
+  ),
+  `Pooled share` = percent(
+    c(prewar$pooled_zev_share, postwar$pooled_zev_share),
+    accuracy = 0.1
+  ),
+  check.names = FALSE
+)
+knitr::kable(event_calculation, caption = "Observed pooled-share calculation")
+```
+
+The observed change is:
+
+$$
+(0.14479 - 0.13922) \times 100 = 0.56
+\text{ percentage points}.
+$$
+
+Gasoline prices changed from \$3.90 to \$5.22 per gallon:
+
+$$
+\left(\frac{5.2213}{3.9019} - 1\right) \times 100 = 33.8\%.
+$$
+
+These are descriptive calculations. They do not adjust for trend, seasonality,
+policy, or other concurrent changes.
+
+## 3. Pre-rolloff regression benchmark
+
+The selected benchmark is estimated only through June 2025:
+
+$$
+ZEVShare_t = \beta_0 + \beta_1 Time_t + \beta_2 Time_t^2
++ \sum_{m=2}^{12}\gamma_m Month_{m,t}
++ \delta COVID_t + \epsilon_t.
+$$
+
+| Variable | How it enters | What it changes |
+|---|---|---|
+| `Time` | Consecutive month number | Long-run adoption trajectory |
+| `Time squared` | Squared month number | Allows the trajectory to accelerate or flatten |
+| Calendar month indicators | February through December, relative to January | Recurring seasonality |
+| `COVID` | 1 from March 2020 through June 2021 | Broad pandemic-era level difference |
+
+The model compares its one-month-ahead prediction $\hat{y}_{t|t-1}$ with the
+observed share in each of 42 rolling validation months:
+
+$$
+RMSE = \sqrt{\frac{1}{42}\sum_{t=1}^{42}
+(y_t - \hat{y}_{t|t-1})^2}.
+$$
+
+```{r benchmark-model-comparison}
+benchmark_table <- models[, c("model", "parameters", "rolling_rmse", "rolling_mae", "selected")]
+benchmark_table$rolling_rmse <- percent(benchmark_table$rolling_rmse, accuracy = 0.01)
+benchmark_table$rolling_mae <- percent(benchmark_table$rolling_mae, accuracy = 0.01)
+names(benchmark_table) <- c("Model", "Parameters", "Rolling RMSE", "Rolling MAE", "Selected")
+knitr::kable(benchmark_table, caption = "Time-ordered benchmark comparison")
+```
+
+The quadratic model has the lowest rolling RMSE, 3.66 percentage points. Its
+March-June 2026 fitted values average 25.7%, compared with 14.5% observed:
+
+$$
+(0.14479 - 0.25719) \times 100 = -11.24
+\text{ percentage points}.
+$$
+
+The dashboard band is $\hat{y}_t \pm 1.96 \times RMSE$, or approximately
+$\hat{y}_t \pm 7.2$ percentage points. It is an empirical forecast-error band,
+not a causal confidence interval.
+
+## 4. Interrupted time-series calculation
+
+The event model adds two level indicators to the benchmark:
+
+$$
+ZEVShare_t = BenchmarkTerms_t
++ \tau_R Rolloff_t + \tau_E PostEvent_t + \epsilon_t.
+$$
+
+`Rolloff` equals 1 beginning November 2025. `PostEvent` equals 1 beginning
+March 2026, so $\tau_E$ is the additional level difference after March,
+conditional on the combined rolloff, trend, seasonality, and COVID terms.
+
+```{r event-coefficient-calculation}
+event_terms <- its[its$term %in% c(
+  "post_combined_incentive_rolloff", "post_war"
+), c("term", "estimate", "confidence_low", "confidence_high", "p_value")]
+event_terms$estimate <- round(100 * event_terms$estimate, 2)
+event_terms$confidence_low <- round(100 * event_terms$confidence_low, 2)
+event_terms$confidence_high <- round(100 * event_terms$confidence_high, 2)
+event_terms$p_value <- format.pval(event_terms$p_value, digits = 3, eps = 0.001)
+names(event_terms) <- c("Variable", "Effect (percentage points)", "CI low", "CI high", "p-value")
+knitr::kable(event_terms, caption = "How the event indicators affect modeled ZEV-title share")
+```
+
+For example, the post-event coefficient is converted to percentage points as:
+
+$$
+0.011523 \times 100 = 1.15 \text{ percentage points}.
+$$
+
+Newey-West standard errors with four lags adjust the confidence intervals and
+p-values for monthly heteroskedasticity and serial correlation. They do not
+change the coefficient estimates. Because the indicators are not randomized,
+the coefficients are adjusted associations, not causal effects.
+
+## 5. Gas-price association calculation
+
+The exposure precedes the title month:
+
+$$
+Prior3MonthGas_t = \frac{Gas_{t-1} + Gas_{t-2} + Gas_{t-3}}{3}.
+$$
+
+The association model is:
+
+$$
+ZEVShare_t = BenchmarkTerms_t + PolicyTerms_t
++ \theta Prior3MonthGas_t + \epsilon_t.
+$$
+
+The policy terms indicate Washington's sales-tax exemption, the instant-rebate
+period, the July-October 2025 transition, and the combined post-rolloff period.
+Unemployment, electricity price, and the post-event indicator are added in
+separate sensitivity specifications.
+
+```{r gas-sensitivity-calculation}
+gas_display <- gas_sensitivity[, c(
+  "model", "gas_estimate", "gas_confidence_low", "gas_confidence_high", "gas_p_value"
+)]
+gas_display$gas_estimate <- round(100 * gas_display$gas_estimate, 2)
+gas_display$gas_confidence_low <- round(100 * gas_display$gas_confidence_low, 2)
+gas_display$gas_confidence_high <- round(100 * gas_display$gas_confidence_high, 2)
+gas_display$gas_p_value <- format.pval(gas_display$gas_p_value, digits = 3, eps = 0.001)
+names(gas_display) <- c("Specification", "Effect per USD 1 (points)", "CI low", "CI high", "p-value")
+knitr::kable(gas_display, caption = "Gas-price coefficient across control specifications")
+```
+
+The policy-adjusted coefficient is calculated as
+$0.027701 \times 100 = 2.77$ percentage points per \$1 per gallon. Adding
+electricity prices reduces it to 2.00 points and widens the uncertainty across
+zero. This sensitivity is why the result is described as predictive rather
+than causal.
+
+## 6. Vehicle-miles-traveled calculation
+
+VMT is evaluated as a separate outcome:
+
+$$
+VMTYoY_t = \left(\frac{VMT_t}{VMT_{t-12}} - 1\right) \times 100.
+$$
+
+A value of -1.0% means estimated travel was 1.0% lower than in the same month
+one year earlier. VMT is not included as a ZEV-share predictor because driving
+may itself respond to gasoline prices.
+
+## 7. County change calculation
+
+For each county $c$:
+
+$$
+CountyChange_c = 100 \times
+\left(
+\frac{PostEventZEVTitles_c}{PostEventLDVTitles_c}
+-
+\frac{PreEventZEVTitles_c}{PreEventLDVTitles_c}
+\right).
+$$
+
+The median county change gives every county equal weight. The statewide change
+weights counties by title volume. This explains how 32 of 39 counties can
+increase while the statewide gain remains 0.56 points, especially because
+large King County declined.
+
+## 8. California index calculation
+
+Washington titles and California inferred sales have different definitions,
+so the dashboard compares direction after setting each series to 100 in 2025
+Q4:
+
+$$
+Index_{s,q} = \frac{ZEVShare_{s,q}}{ZEVShare_{s,2025Q4}} \times 100.
+$$
+
+An index of 105 means the share is 5% above that state's own 2025 Q4 value. It
+does not mean the two states have the same ZEV-share level.
+
+## 9. Conjoint calculation
+
+The original survey scale uses 1 as best and 5 as worst. It is reversed so
+higher values mean stronger preference:
+
+$$
+PreferenceScore_{i,j} = 6 - Rating_{i,j}.
+$$
+
+The rating model is:
+
+$$
+PreferenceScore_{i,j} = \alpha_i
++ Brand_j + FuelEconomy_j + Price_j + \epsilon_{i,j},
+$$
+
+where $\alpha_i$ is a respondent fixed effect. Brand, fuel economy, and price
+are effect-coded, so each level is interpreted relative to its attribute's
+grand mean. CR1 standard errors are clustered by respondent because each
+person rates multiple profiles.
+
+```{r conjoint-calculation}
+price_test <- conjoint_tests[conjoint_tests$attribute == "Price", ]
+price_contrast <- conjoint_pairwise[
+  conjoint_pairwise$attribute == "Price" &
+    conjoint_pairwise$level_1 == "$30,000" &
+    conjoint_pairwise$level_2 == "$120,000",
+]
+conjoint_calculation <- data.frame(
+  Result = c(
+    "Rated respondents",
+    "Usable profile ratings",
+    "Joint price test",
+    "USD 30,000 minus USD 120,000"
+  ),
+  Calculation = c(
+    conjoint_audit$value[conjoint_audit$metric == "survey_ids_with_at_least_one_rating"],
+    conjoint_audit$value[conjoint_audit$metric == "complete_ratings"],
+    paste0("F = ", round(price_test$f_statistic, 2)),
+    paste0(round(price_contrast$preference_difference, 2), " preference points")
+  ),
+  `p-value` = c(
+    NA,
+    NA,
+    round(price_test$p_value, 3),
+    round(price_contrast$p_value, 3)
+  ),
+  check.names = FALSE
+)
+knitr::kable(conjoint_calculation, caption = "Conjoint sample and price calculation")
+```
+
+Price is the clearest survey attribute. Brand and fuel economy are not given
+standalone managerial interpretations because Tesla is not crossed with the
+lower fuel-economy levels, which confounds those two variables.
+
+## Variable-to-decision summary
+
+| Variable movement | Supported interpretation | Decision implication |
+|---|---|---|
+| Post-event indicator is positive but uncertain | No distinct recovery is established | Do not expand statewide inventory on this result alone |
+| Higher prior-three-month gas price predicts higher ZEV share | Fuel cost adds modest predictive information | Use total-cost messaging, but do not claim causation |
+| Electricity control weakens the gas coefficient | Relative energy costs and correlated conditions matter | Treat the gas result as specification-sensitive |
+| Most counties increase but King declines | Statewide averages mask geography | Target large positive markets selectively |
+| Lower survey price raises preference | Affordability is the clearest stated preference | Lead with price and affordability |
+| VMT is mixed | No sustained driving reduction is established | Avoid overstating behavioral response |

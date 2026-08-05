@@ -1,0 +1,3 @@
+"window","first_month","last_month","months","mean_yoy_change","median_yoy_change","minimum_yoy_change","maximum_yoy_change","months_below_prior_year"
+"March-May 2025 comparison window",2025-03-01,2025-05-01,3,0.012,0.012,0.008,0.016,0
+"March-May 2026 post-war window",2026-03-01,2026-05-01,3,0.00866666666666667,-0.001,-0.008,0.035,2

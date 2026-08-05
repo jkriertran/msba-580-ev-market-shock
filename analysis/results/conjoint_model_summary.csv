@@ -1,0 +1,10 @@
+"statistic","value"
+"rated_profiles",123
+"rated_respondents",18
+"r_squared",0.281610329609
+"adjusted_r_squared",0.114711719316141
+"rmse_preference_score",1.25826104602723
+"incremental_r_squared_over_respondent_only",0.22143740314131
+"nested_model_f_statistic",5.08598230517848
+"nested_model_p_value",0.000137411783609966
+"cluster_degrees_of_freedom",17

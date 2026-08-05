@@ -10,12 +10,32 @@ project_root <- normalizePath(
 invisible(parse(file.path(project_root, "app.R")))
 
 required_files <- c(
+  "data/washington_titles_monthly.csv",
+  "data/washington_county_monthly.csv",
+  "data/washington_gas_monthly.csv",
+  "data/washington_unemployment_monthly.csv",
+  "data/washington_electricity_monthly.csv",
+  "data/washington_policy_monthly.csv",
+  "data/washington_vmt_monthly.csv",
   "data/quarterly_controls.csv",
-  "data/county_panel.csv",
-  "data/california_vmt_monthly.csv",
-  "data/data_dictionary.csv"
+  "data/conjoint_survey.csv",
+  "data/data_dictionary.csv",
+  "analysis/results/washington_monthly_analysis.csv",
+  "analysis/results/washington_model_comparison.csv",
+  "analysis/results/washington_its_coefficients.csv",
+  "analysis/results/washington_event_summary.csv",
+  "analysis/results/washington_county_postwar.csv",
+  "analysis/results/washington_data_audit.csv",
+  "analysis/results/washington_gas_model_comparison.csv",
+  "analysis/results/washington_gas_model_coefficients.csv",
+  "analysis/results/washington_gas_model_sensitivity.csv",
+  "analysis/results/washington_gas_model_diagnostics.csv",
+  "analysis/results/conjoint_data_audit.csv",
+  "analysis/results/conjoint_partworths.csv",
+  "analysis/results/conjoint_attribute_tests.csv",
+  "analysis/results/conjoint_pairwise_contrasts.csv",
+  "report/final_report.Rmd"
 )
-
 missing_files <- required_files[
   !file.exists(file.path(project_root, required_files))
 ]
@@ -24,19 +44,41 @@ if (length(missing_files)) {
 }
 
 required_columns <- list(
+  "data/washington_titles_monthly.csv" = c(
+    "month", "total_new_ldv_titles", "bev_titles", "phev_titles",
+    "fcev_titles", "zev_titles", "zev_share", "source_url"
+  ),
+  "data/washington_county_monthly.csv" = c(
+    "county", "month", "total_new_ldv_titles", "zev_titles", "zev_share"
+  ),
+  "data/washington_gas_monthly.csv" = c(
+    "month", "washington_regular_gas_price", "weekly_observations",
+    "source_url"
+  ),
+  "data/washington_unemployment_monthly.csv" = c(
+    "month", "washington_unemployment_rate", "estimate_status",
+    "source_series", "source_url"
+  ),
+  "data/washington_electricity_monthly.csv" = c(
+    "month", "washington_residential_electricity_cents_kwh",
+    "source_series", "source_url"
+  ),
+  "data/washington_policy_monthly.csv" = c(
+    "month", "wa_sales_tax_exemption_active",
+    "wa_instant_rebate_active", "combined_incentive_transition",
+    "post_combined_incentive_rolloff"
+  ),
+  "data/washington_vmt_monthly.csv" = c(
+    "month", "vmt_million_miles", "yoy_change", "estimate_status",
+    "source_url"
+  ),
   "data/quarterly_controls.csv" = c(
-    "quarter_start", "quarter_label", "zev_sales", "total_ldv_sales",
-    "zev_share", "ca_regular_gas_avg", "trends_electric_vehicle"
+    "quarter_start", "zev_sales", "total_ldv_sales", "zev_share"
   ),
-  "data/county_panel.csv" = c(
-    "year", "quarter", "county", "zev_sales", "total_ldv_sales", "zev_share"
-  ),
-  "data/california_vmt_monthly.csv" = c(
-    "observation_month", "vmt_million_miles", "yoy_change",
-    "estimate_status", "source_url"
+  "data/conjoint_survey.csv" = c(
+    "SurveyID", "orderShown", "Brand", "MPG", "Price", "Rating"
   )
 )
-
 for (path in names(required_columns)) {
   header <- names(read.csv(
     file.path(project_root, path),
@@ -49,4 +91,151 @@ for (path in names(required_columns)) {
   }
 }
 
-message("Project validation passed.")
+washington <- read.csv(
+  file.path(project_root, "data/washington_titles_monthly.csv"),
+  stringsAsFactors = FALSE
+)
+washington$month <- as.Date(washington$month)
+expected_months <- seq(
+  min(washington$month),
+  max(washington$month),
+  by = "month"
+)
+if (
+  nrow(washington) < 100L ||
+    !identical(washington$month, expected_months) ||
+    max(washington$month) < as.Date("2026-06-01")
+) {
+  stop("Washington statewide series must contain 100+ consecutive months.")
+}
+recomputed_titles <- with(
+  washington,
+  bev_titles + phev_titles + fcev_titles
+)
+if (
+  any(recomputed_titles != washington$zev_titles) ||
+    any(abs(
+      washington$zev_share -
+        washington$zev_titles / washington$total_new_ldv_titles
+    ) > 1e-10)
+) {
+  stop("Washington ZEV numerator or share failed recomputation.")
+}
+
+county <- read.csv(
+  file.path(project_root, "data/washington_county_monthly.csv"),
+  stringsAsFactors = FALSE
+)
+known_counties <- setdiff(unique(county$county), "Unknown or Out of State")
+if (length(known_counties) != 39L) {
+  stop("Washington county data must contain exactly 39 named counties.")
+}
+
+models <- read.csv(
+  file.path(project_root, "analysis/results/washington_model_comparison.csv"),
+  stringsAsFactors = FALSE
+)
+if (
+  nrow(models) != 3L ||
+    sum(models$selected) != 1L ||
+    models$rolling_rmse[models$selected] >= .05
+) {
+  stop("Washington model selection failed expected rolling checks.")
+}
+
+its <- read.csv(
+  file.path(project_root, "analysis/results/washington_its_coefficients.csv"),
+  stringsAsFactors = FALSE
+)
+if (!all(c(
+  "post_combined_incentive_rolloff",
+  "post_war"
+) %in% its$term)) {
+  stop("Interrupted-time-series event coefficients are missing.")
+}
+
+events <- read.csv(
+  file.path(project_root, "analysis/results/washington_event_summary.csv"),
+  stringsAsFactors = FALSE
+)
+if (
+  events$months[
+    events$period == "Post-incentive-rolloff / pre-war"
+  ] != 4L ||
+    events$months[events$period == "Post-war"] != 4L
+) {
+  stop("Event summary must use four pre-war and four post-war months.")
+}
+
+gas_models <- read.csv(
+  file.path(
+    project_root,
+    "analysis/results/washington_gas_model_comparison.csv"
+  ),
+  stringsAsFactors = FALSE
+)
+if (
+  nrow(gas_models) != 5L ||
+    sum(gas_models$selected_gas_candidate) != 1L ||
+    gas_models$rolling_rmse[
+      gas_models$model == "prior_three_month_average_gas"
+    ] >= gas_models$rolling_rmse[gas_models$model == "no_gas"]
+) {
+  stop("Gas-price rolling-model comparison failed expected checks.")
+}
+gas_coefficients <- read.csv(
+  file.path(
+    project_root,
+    "analysis/results/washington_gas_model_coefficients.csv"
+  ),
+  stringsAsFactors = FALSE
+)
+if (!"gas_price_prior_3m" %in% gas_coefficients$term) {
+  stop("Gas-price association coefficient is missing.")
+}
+
+vmt <- read.csv(
+  file.path(project_root, "data/washington_vmt_monthly.csv"),
+  stringsAsFactors = FALSE
+)
+vmt$month <- as.Date(vmt$month)
+if (
+  nrow(vmt) < 36L ||
+    anyDuplicated(vmt$month) ||
+    max(vmt$month) < as.Date("2026-05-01")
+) {
+  stop("Washington VMT snapshot failed coverage checks.")
+}
+
+conjoint <- read.csv(
+  file.path(project_root, "data/conjoint_survey.csv"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+if (
+  nrow(conjoint) != 140L ||
+    length(unique(conjoint$SurveyID)) != 20L ||
+    any(grepl("name", names(conjoint), ignore.case = TRUE))
+) {
+  stop("Conjoint snapshot failed size or privacy checks.")
+}
+valid_ratings <- is.na(conjoint$Rating) | conjoint$Rating %in% 1:5
+if (!all(valid_ratings) || sum(!is.na(conjoint$Rating)) != 123L) {
+  stop("Conjoint ratings must contain 123 valid values from 1 through 5.")
+}
+partworths <- read.csv(
+  file.path(project_root, "analysis/results/conjoint_partworths.csv"),
+  stringsAsFactors = FALSE
+)
+if (
+  nrow(partworths) != 9L ||
+    any(abs(tapply(
+      partworths$utility,
+      partworths$attribute,
+      sum
+    )) > 1e-8)
+) {
+  stop("Conjoint part-worth utilities must contain nine effect-coded levels.")
+}
+
+message("Washington-first project validation passed.")
