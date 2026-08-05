@@ -618,7 +618,48 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "03 / California comparison"),
+        div(class = "section-kicker", "03 / County response"),
+        h2(class = "panel-title", "Where did ZEV title share change?"),
+        p(
+          class = "panel-subtitle",
+          paste(
+            "Post-war March–June 2026 versus post-rolloff/pre-war",
+            "November 2025–February 2026; largest county markets shown."
+          )
+        ),
+        plotlyOutput("county_plot", height = "470px"),
+        calculation_note(
+          title = "County-level change between pooled four-month periods",
+          measure = p(
+            "For each county, the chart compares the pooled March-June 2026 ",
+            "ZEV title share with the pooled November 2025-February 2026 share."
+          ),
+          formula = tagList(
+            code("period share_c = sum(ZEV titles_c) / sum(all new LDV titles_c)"),
+            tags$br(),
+            code("change_c = postwar share_c - prewar share_c")
+          ),
+          variables = tagList(
+            p(strong("c: "), "county."),
+            p(
+              strong("Pre-period: "),
+              "November 2025 through February 2026."
+            ),
+            p(strong("Post-period: "), "March through June 2026.")
+          ),
+          interpretation = p(
+            "Bars show percentage-point changes. Pooling title counts gives ",
+            "higher-volume months the appropriate weight within each county."
+          ),
+          caution = paste(
+            "County changes are descriptive and can be volatile in smaller",
+            "markets. Unknown or out-of-state geography is excluded."
+          )
+        )
+      ),
+      tags$section(
+        class = "panel",
+        div(class = "section-kicker", "04 / California comparison"),
         h2(class = "panel-title", "Did the neighboring market move similarly?"),
         p(
           class = "panel-subtitle",
@@ -661,7 +702,7 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "04 / Regression benchmark"),
+        div(class = "section-kicker", "05 / Regression benchmark"),
         h2(class = "panel-title", "Observed share versus pre-rolloff expectation"),
         p(
           class = "panel-subtitle",
@@ -719,7 +760,7 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "05 / Gas-price association"),
+        div(class = "section-kicker", "06 / Gas-price association"),
         h2(class = "panel-title", "Did gasoline prices add predictive signal?"),
         p(
           class = "panel-subtitle",
@@ -862,47 +903,6 @@ ui <- fluidPage(
       ),
       tags$section(
         class = "panel",
-        div(class = "section-kicker", "06 / County response"),
-        h2(class = "panel-title", "Where did ZEV title share change?"),
-        p(
-          class = "panel-subtitle",
-          paste(
-            "Post-war March–June 2026 versus post-rolloff/pre-war",
-            "November 2025–February 2026; largest county markets shown."
-          )
-        ),
-        plotlyOutput("county_plot", height = "470px"),
-        calculation_note(
-          title = "County-level change between pooled four-month periods",
-          measure = p(
-            "For each county, the chart compares the pooled March-June 2026 ",
-            "ZEV title share with the pooled November 2025-February 2026 share."
-          ),
-          formula = tagList(
-            code("period share_c = sum(ZEV titles_c) / sum(all new LDV titles_c)"),
-            tags$br(),
-            code("change_c = postwar share_c - prewar share_c")
-          ),
-          variables = tagList(
-            p(strong("c: "), "county."),
-            p(
-              strong("Pre-period: "),
-              "November 2025 through February 2026."
-            ),
-            p(strong("Post-period: "), "March through June 2026.")
-          ),
-          interpretation = p(
-            "Bars show percentage-point changes. Pooling title counts gives ",
-            "higher-volume months the appropriate weight within each county."
-          ),
-          caution = paste(
-            "County changes are descriptive and can be volatile in smaller",
-            "markets. Unknown or out-of-state geography is excluded."
-          )
-        )
-      ),
-      tags$section(
-        class = "panel",
         div(class = "section-kicker", "07 / Stated preferences"),
         h2(class = "panel-title", "What did survey respondents value?"),
         p(
@@ -1007,7 +1007,7 @@ ui <- fluidPage(
             h3("Counts, shares, and changes"),
             p(
               paste(
-              "Sections 01, 02, 03, and 06 summarize recorded titles, driving,",
+              "Sections 01, 02, 03, and 04 summarize recorded titles, driving,",
                 "or comparison data. They describe what happened without assigning",
                 "a cause."
               )
@@ -1019,7 +1019,7 @@ ui <- fluidPage(
             h3("Expected path and event shifts"),
             p(
               paste(
-              "Section 04 compares observed share with a rolling-validated",
+              "Section 05 compares observed share with a rolling-validated",
                 "pre-event forecast and estimates level shifts with an",
                 "interrupted time series."
               )
@@ -1031,7 +1031,7 @@ ui <- fluidPage(
             h3("Fuel price and stated preference"),
             p(
               paste(
-              "Sections 05 and 07 report coefficients with uncertainty.",
+              "Sections 06 and 07 report coefficients with uncertainty.",
                 "Intervals and specification sensitivity matter as much as the",
                 "point estimate."
               )
@@ -1464,7 +1464,7 @@ server <- function(input, output, session) {
         strong("Important distinction: "),
         paste(
           "gasoline price is not a predictor in this benchmark; it is modeled",
-            "separately in Section 05. The benchmark does not prove that the",
+            "separately in Section 06. The benchmark does not prove that the",
           "state or federal incentive expirations, or the war, caused the change."
         )
       )
