@@ -19,10 +19,10 @@ class DashboardStoryOrderTest(unittest.TestCase):
             [
                 "01 / Monthly market",
                 "02 / Behavioral response",
-                "03 / California comparison",
-                "04 / Regression benchmark",
-                "05 / Gas-price association",
-                "06 / County response",
+                "03 / County response",
+                "04 / California comparison",
+                "05 / Regression benchmark",
+                "06 / Gas-price association",
                 "07 / Stated preferences",
             ],
         )
@@ -31,10 +31,10 @@ class DashboardStoryOrderTest(unittest.TestCase):
         app_source = APP_PATH.read_text(encoding="utf-8")
 
         expected_references = [
-            "Sections 01, 02, 03, and 06 summarize recorded titles, driving,",
-            "Section 04 compares observed share with a rolling-validated",
-            "Sections 05 and 07 report coefficients with uncertainty.",
-            "separately in Section 05. The benchmark does not prove that the",
+            "Sections 01, 02, 03, and 04 summarize recorded titles, driving,",
+            "Section 05 compares observed share with a rolling-validated",
+            "Sections 06 and 07 report coefficients with uncertainty.",
+            "separately in Section 06. The benchmark does not prove that the",
         ]
 
         for reference in expected_references:
